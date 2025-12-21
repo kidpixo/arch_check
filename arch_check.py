@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 def check_smart():
     """Check SMART health for all disks using smartctl. Warn if any disk is failing."""
     global issue_count
