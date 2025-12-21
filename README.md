@@ -10,6 +10,10 @@ It is a glorified cli command glue and frontend.
 - Checks SMART disk health
 - Kernel, pacnew, failed services, orphaned packages, and more
 
+![arch_check screenshot](screenshot.png)
+
+*Screenshot: arch_check in action*
+
 ## Usage
 
 ```sh
