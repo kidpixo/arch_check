@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.log
+
+# Build
+build/
+dist/
+
+# pipx/venv
+.venv/
+venv/
+
+# Arch package build
+*.pkg.tar.zst
+pkg/
+src/
+
+# Editor/OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

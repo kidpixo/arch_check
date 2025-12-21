@@ -1,4 +1,4 @@
-# arch_chek
+# arch_check
 
 Arch Linux system health and disk origin checker CLI.
 Written only with python stdlib, no dependencies. 
@@ -13,11 +13,11 @@ It is a glorified cli command glue and frontend.
 ## Usage
 
 ```sh
-arch_chek -d           # Show disk usage and device origins
-arch_chek --sensors    # Show temperature sensors
-arch_chek --smart      # Show SMART disk health
-arch_chek -a           # Run all checks
-arch_chek --help       # Show all options
+arch_check -d           # Show disk usage and device origins
+arch_check --sensors    # Show temperature sensors
+arch_check --smart      # Show SMART disk health
+arch_check -a           # Run all checks
+arch_check --help       # Show all options
 ```
 
 ## Install (Recommended: pipx)
@@ -32,7 +32,7 @@ pipx install .
 makepkg -si
 ```
 
-This will install the CLI as `/usr/bin/arch_chek`.
+This will install the CLI as `/usr/bin/arch_check`.
 
 ## Requirements
 - Python 3.8+

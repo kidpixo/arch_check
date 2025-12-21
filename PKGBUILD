@@ -1,5 +1,5 @@
 # Maintainer: kidpixo <your@email.com>
-pkgname=arch_chek
+pkgname=arch_check
 gitname=arch-check
 pkgver=1.0.0
 pkgrel=1
