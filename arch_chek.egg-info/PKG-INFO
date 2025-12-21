@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: arch_check
+Version: 1.0.0
+Summary: Arch Linux system health and disk origin checker CLI.
+Author: kidpixo
+License-Expression: MIT
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown

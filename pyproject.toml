@@ -1,0 +1,15 @@
+[project]
+name = "arch_check"
+version = "1.0.0"
+description = "Arch Linux system health and disk origin checker CLI."
+authors = [ { name = "kidpixo" } ]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.scripts]
+arch_check = "arch_check:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
