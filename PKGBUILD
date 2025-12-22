@@ -10,7 +10,7 @@ license=('MIT')
 depends=('python')
 makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
 source=("arch_check.py" "pyproject.toml")
-md5sums=('SKIP' 'SKIP')
+md5sums=('5e7a064e0917ca23797efa577e4a8056' '7bdec62ca089d089b20c62cf01ffb98f')
 
 build() {
   cd "$srcdir"

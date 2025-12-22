@@ -1,3 +1,4 @@
+tags
 # Python
 __pycache__/
 *.pyc
@@ -19,6 +20,7 @@ venv/
 *.pkg.tar.zst
 pkg/
 src/
+build/
 
 # Editor/OS
 .DS_Store

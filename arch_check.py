@@ -48,21 +48,27 @@ YELLOW = '\033[33m'
 BOLD = '\033[1m'
 RESET = '\033[0m'
 
-# The high-detail ASCII logo provided
+# The high-detail ASCII logo provided from https://github.com/deater/linux_logo
 ARCH_LOGO = [
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣿⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣷⣤⣙⢻⣿⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡄⠀⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⡿⠛⠛⠿⣿⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠙⣿⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⠀⣰⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⢿⣿⣿⣿⣿⠿⣆⠀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⠀⠀⣴⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣷⣦⡀⠀⠀⠀{RESET}",
-f"{CYAN}⠀⢀⣾⣿⣿⠿⠟⠛⠋⠉⠉⠀⠀⠀⠀⠀⠀⠉⠉⠙⠛⠻⠿⣿⣿⣷⡀⠀{RESET}",
-f"{CYAN}⣠⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⣄{RESET}",
+f"{CYAN}                   -`      {RESET}",
+f"{CYAN}                  .o+`     {RESET}",
+f"{CYAN}                 `ooo/     {RESET}",
+f"{CYAN}                `+oooo:    {RESET}",
+f"{CYAN}               `+oooooo:   {RESET}",
+f"{CYAN}               -+oooooo+:  {RESET}",
+f"{CYAN}             `/:-:++oooo+: {RESET}",
+f"{CYAN}            `/++++/+++++++:{RESET}",
+f"{CYAN}           `/++++++++++++++:{RESET}",
+f"{CYAN}          `/+++++oooooooooo/`{RESET}",
+f"{CYAN}         ./ooosssso++osssssso+`{RESET}",
+f"{CYAN}        .oossssso-````/ossssss+`{RESET}",
+f"{CYAN}       -osssssso.      :ssssssso.{RESET}",
+f"{CYAN}      :osssssss/        osssso+++.{RESET}",
+f"{CYAN}     /ossssssss/        +ssssooo/-{RESET}",
+f"{CYAN}   `/ossssso+/:-        -:/+osssso+-{RESET}",
+f"{CYAN}  `+sso+:-`                 `.-/+oso:{RESET}",
+f"{CYAN} `++:.                           `-/+/ {RESET}",
+f"{CYAN}    [ logo from deater/linux_logo ]{RESET}",
 ]
 
 # Shared counter for the final summary
@@ -159,8 +165,8 @@ def check_disk():
     global issue_count
     print_header("Disk Usage & Origins")
     critical_mounts = ['/', '/boot', '/home', '/var']
-    print(f"{BOLD}{'Mount':<10} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin'}{RESET}")
-    print("─" * 120)
+    print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<20} : {'Subvol'}{RESET}")
+    print("─" * 140)
 
     # Get mount -> fs type
     with open('/proc/mounts', 'r') as f:
@@ -185,11 +191,42 @@ def check_disk():
             result = walk(dev, [])
             if result:
                 return result
-        return ([], None)
+        # Fallback: use findmnt to get device, then lsblk to get ancestry
+        try:
+            dev_path = subprocess.check_output(["findmnt", "-nno", "SOURCE", mount], text=True).strip()
+            # Remove /dev/ if present
+            dev_name = os.path.basename(dev_path)
+            # Recursively search for dev_name in blkinfo
+            def search_dev(devs, chain):
+                for dev in devs:
+                    if dev.get("name") == dev_name:
+                        return (chain + [dev["name"]], dev)
+                    if "children" in dev:
+                        result = search_dev(dev["children"], chain + [dev["name"]])
+                        if result:
+                            return result
+                return None
+            result = search_dev(blkinfo, [])
+            if result:
+                return result
+            # If still not found, just return the device name
+            return ([dev_name], {"name": dev_name, "fstype": "unknown", "type": "unknown"})
+        except Exception as e:
+            return ([], None)
 
     for mount in critical_mounts:
         if mount not in mount_data:
-            print(f"{mount:<10} : {YELLOW}Not mounted{RESET}")
+            # Only show as 'Not mounted' if it is a separate mount point in fstab or /proc/mounts
+            # Otherwise, skip it entirely
+            if mount == '/var':
+                try:
+                    with open('/etc/fstab', 'r') as fstab:
+                        found = any(line.strip() and not line.strip().startswith('#') and any(part == '/var' for part in line.split()) for line in fstab)
+                    if not found:
+                        continue
+                except Exception:
+                    continue
+            print(f"{mount:<15} : {YELLOW}Not mounted{RESET}")
             continue
         try:
             total, used, free = shutil.disk_usage(mount)
@@ -203,17 +240,74 @@ def check_disk():
 
             # Find device info and origin chain
             chain, dev_entry = find_chain_and_dev_by_mount(mount)
-            if not chain or not dev_entry or "name" not in dev_entry:
-                print(f"{mount:<10} : {RED}No device info found for mountpoint{RESET}")
-                continue
-            device = f"/dev/{dev_entry['name']}"
-            fstype = dev_entry.get('fstype', 'unknown')
-            dtype = dev_entry.get('type', 'unknown')
-            origin = '.'.join(chain) if chain else dev_entry.get('name', 'unknown')
+            subvol = ""
+            # Try to get subvolume info for btrfs
+            try:
+                # Try findmnt with SUBVOL support, capture stderr too
+                findmnt_out = subprocess.check_output(["findmnt", "-nno", "SOURCE,SUBVOL", mount], text=True, stderr=subprocess.STDOUT).strip()
+                if 'unknown column' in findmnt_out or 'findmnt:' in findmnt_out:
+                    raise Exception('findmnt SUBVOL not supported')
+                parts = findmnt_out.split()
+                dev_path = parts[0] if parts else ""
+                subvol = parts[1] if len(parts) > 1 else ""
+            except Exception:
+                # Fallback: get device only
+                try:
+                    dev_path_raw = subprocess.check_output(["findmnt", "-nno", "SOURCE", mount], text=True).strip()
+                    # If output is /dev/xxx[subvol], parse device and subvol
+                    import re
+                    m = re.match(r"(/dev/\S+)(\[(.+)\])?", dev_path_raw)
+                    if m:
+                        dev_path = m.group(1)
+                        subvol = m.group(3) if m.group(3) else ""
+                    else:
+                        dev_path = dev_path_raw
+                        subvol = ""
+                except Exception:
+                    dev_path = f"/dev/{dev_entry['name']}" if dev_entry and 'name' in dev_entry else ""
+                    subvol = ""
+                # Try to get subvol from /etc/fstab if not found
+                if not subvol:
+                    try:
+                        with open('/etc/fstab', 'r') as fstab:
+                            for line in fstab:
+                                if line.strip() and not line.strip().startswith('#') and mount in line:
+                                    opts = line.split()
+                                    if len(opts) > 3:
+                                        for opt in opts[3].split(','):
+                                            if opt.startswith('subvol='):
+                                                subvol = opt.split('=',1)[1]
+                    except Exception:
+                        pass
+            # If btrfs, always use the real block device for device/origin
+            if dev_entry and (dev_entry.get('fstype', '') == 'btrfs' or (dev_path and dev_path and dev_path.startswith('/dev/') and 'btrfs' in (dev_entry.get('fstype', '') or ''))):
+                # Clean trailing ']' from device and origin if present
+                device = dev_path.rstrip(']') if dev_path.endswith(']') else dev_path
+                dev_name = os.path.basename(device)
+                def search_dev(devs, chain):
+                    for dev in devs:
+                        if dev.get("name") == dev_name:
+                            return chain + [dev["name"]]
+                        if "children" in dev:
+                            result = search_dev(dev["children"], chain + [dev["name"]])
+                            if result:
+                                return result
+                    return None
+                origin_chain = search_dev(blkinfo, [])
+                origin = '.'.join(origin_chain) if origin_chain else dev_name
+                # Remove trailing ']' from origin if present
+                origin = origin.rstrip(']') if origin.endswith(']') else origin
+                fstype = 'btrfs'
+                dtype = dev_entry.get('type', 'unknown') if dev_entry else 'unknown'
+            else:
+                device = f"/dev/{dev_entry['name']}" if dev_entry and 'name' in dev_entry else ""
+                fstype = dev_entry.get('fstype', 'unknown') if dev_entry else 'unknown'
+                dtype = dev_entry.get('type', 'unknown') if dev_entry else 'unknown'
+                origin = '.'.join(chain) if chain else (dev_entry.get('name', 'unknown') if dev_entry else 'unknown')
 
-            print(f"{mount:<10} : {color}{percent:>6.1f}%{RESET} : {free/(2**30):>7.2f} GB : {fstype:<8} : {dtype:<10} : {device:<22} : {origin}")
+            print(f"{mount:<15} : {color}{percent:>6.1f}%{RESET} : {free/(2**30):>7.2f} GB : {fstype:<8} : {dtype:<10} : {device:<22} : {origin:<20} : {subvol}")
         except Exception as e:
-            print(f"{mount:<10} : {RED}Error: {e}{RESET}")
+            print(f"{mount:<15} : {RED}Error: {e}{RESET}")
 
 def check_kernel():
     global issue_count
