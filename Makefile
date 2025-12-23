@@ -2,8 +2,9 @@
 #TEST_PATH=extensions/
 .DEFAULT_GOAL := help
 
-update_md5hash: ## Update PKGBUILD md5sums for arch_check.py and pyproject.toml (PKGBUILD must exist)
+update_md5hash_srcinfo: ## Update PKGBUILD md5sums for arch_check.py and pyproject.toml (PKGBUILD must exist)
 	bash update_md5hash.sh
+	makepkg --printsrcinfo > .SRCINFO
 
 pkgbuild: ## Build Arch package using PKGBUILD (PKGBUILD must exist)
 	make update_md5hash

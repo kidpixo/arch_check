@@ -1,35 +1,68 @@
 #!/usr/bin/env python3
-def check_smart():
-    """Check SMART health for all disks using smartctl. Warn if any disk is failing."""
+def check_smart(as_dict=False):
+    """Check SMART health for all disks using smartctl. Warn if any disk is failing. Return dict if as_dict."""
     global issue_count
-    print_header("SMART Disk Health Summary")
+    import glob
+    import subprocess
+    results = []
+    summary = {"status": "ok", "issues": 0, "error": None}
     try:
-        # List all /dev/sd[a-z] and /dev/nvme*n1 devices
-        import glob
         devs = glob.glob('/dev/sd?') + glob.glob('/dev/nvme*n1')
         if not devs:
+            if as_dict:
+                summary["status"] = "no_disks"
+                summary["error"] = "No disks found for SMART check."
+                return {"devices": [], **summary}
+            print_header("SMART Disk Health Summary")
             print(f"{YELLOW}No disks found for SMART check.{RESET}")
             return
         for dev in devs:
+            dev_result = {"device": dev, "status": None, "attributes": [], "error": None}
             try:
                 out = subprocess.check_output(["smartctl", "-H", dev], text=True, stderr=subprocess.STDOUT)
                 if "PASSED" in out:
-                    print(f"{GREEN}{dev}: PASSED{RESET}")
+                    dev_result["status"] = "PASSED"
+                    if not as_dict:
+                        print(f"{GREEN}{dev}: PASSED{RESET}")
                 else:
-                    print(f"{RED}{dev}: {out.strip()}{RESET}")
+                    dev_result["status"] = out.strip()
+                    summary["issues"] += 1
+                    summary["status"] = "attention"
+                    if not as_dict:
+                        print(f"{RED}{dev}: {out.strip()}{RESET}")
                     issue_count += 1
-                # Optionally print some attributes
+                # Optionally collect some attributes
                 attr = subprocess.check_output(["smartctl", "-A", dev], text=True, stderr=subprocess.STDOUT)
                 for line in attr.splitlines():
                     if any(x in line for x in ["Reallocated_Sector_Ct", "Power_On_Hours", "Temperature_Celsius", "Media_Wearout_Indicator"]):
-                        print(f"  {line.strip()}")
+                        dev_result["attributes"].append(line.strip())
+                        if not as_dict:
+                            print(f"  {line.strip()}")
             except subprocess.CalledProcessError as e:
-                print(f"{YELLOW}{dev}: SMART not available or permission denied.{RESET}")
+                dev_result["status"] = "unavailable"
+                dev_result["error"] = "SMART not available or permission denied."
+                if not as_dict:
+                    print(f"{YELLOW}{dev}: SMART not available or permission denied.{RESET}")
             except Exception as e:
-                print(f"{RED}{dev}: SMART check failed: {e}{RESET}")
+                dev_result["status"] = "error"
+                dev_result["error"] = str(e)
+                if not as_dict:
+                    print(f"{RED}{dev}: SMART check failed: {e}{RESET}")
+            results.append(dev_result)
+        if as_dict:
+            return {"devices": results, **summary}
+        print_header("SMART Disk Health Summary")
     except FileNotFoundError:
+        if as_dict:
+            summary["status"] = "no_smartctl"
+            summary["error"] = "smartctl command not found. Please install smartmontools."
+            return {"devices": [], **summary}
         print(f"{YELLOW}smartctl command not found. Please install smartmontools.{RESET}")
     except Exception as e:
+        if as_dict:
+            summary["status"] = "error"
+            summary["error"] = str(e)
+            return {"devices": [], **summary}
         print(f"{RED}SMART summary failed: {e}{RESET}")
 #!/usr/bin/env python3
 import subprocess
@@ -92,33 +125,53 @@ def get_device_origin(mount_point: str):
 
 # --- Main Check Functions ---
 
-def check_sensors(temp_warn: int = 80):
+def check_sensors(temp_warn: int = 80, as_dict=False):
     """Check and print all available sensor temperatures. Warn if any exceed temp_warn (Celsius)."""
     global issue_count
-    print_header("Temperature & Sensors")
+    import re
     try:
         out = subprocess.check_output(["sensors"], text=True)
         lines = out.splitlines()
+        sensors = []
         high_found = False
         for line in lines:
             if "temp" in line.lower() or "core" in line.lower() or "Package id" in line:
-                # Try to extract temperature value
-                import re
                 match = re.search(r'([+-]?[0-9]+\.[0-9])°C', line)
                 if match:
                     temp = float(match.group(1))
-                    color = RED if temp >= temp_warn else (YELLOW if temp >= temp_warn-10 else GREEN)
-                    print(f"{color}{line.strip()}{RESET}")
+                    entry = {
+                        "label": line.strip(),
+                        "temp": temp,
+                        "warn": temp >= temp_warn,
+                        "color": "red" if temp >= temp_warn else ("yellow" if temp >= temp_warn-10 else "green")
+                    }
+                    sensors.append(entry)
+                    if not as_dict:
+                        color = RED if temp >= temp_warn else (YELLOW if temp >= temp_warn-10 else GREEN)
+                        print(f"{color}{line.strip()}{RESET}")
                     if temp >= temp_warn:
                         high_found = True
+        if as_dict:
+            return {
+                "sensors": sensors,
+                "count": len(sensors),
+                "high_temp": high_found,
+                "status": "warn" if high_found else "ok",
+                "issues": 1 if high_found else 0
+            }
+        print_header("Temperature & Sensors")
         if high_found:
             print(f"{RED}{BOLD}Warning: High temperature detected!{RESET}")
             issue_count += 1
         if not lines:
             print(f"{YELLOW}No sensor data found. Is lm_sensors installed and configured?{RESET}")
     except FileNotFoundError:
+        if as_dict:
+            return {"sensors": [], "count": 0, "high_temp": False, "status": "no_sensors", "issues": 0, "error": "sensors command not found"}
         print(f"{YELLOW}sensors command not found. Please install lm_sensors.{RESET}")
     except Exception as e:
+        if as_dict:
+            return {"sensors": [], "count": 0, "high_temp": False, "status": "error", "issues": 0, "error": str(e)}
         print(f"{RED}Sensor check failed: {e}{RESET}")
 
 def print_logo_info():
@@ -311,54 +364,125 @@ def check_disk():
 
 def check_kernel():
     global issue_count
-    print_header("Kernel Version Check")
-    try:
-        pac_out = subprocess.check_output(["pacman", "-Qi", "linux"], text=True)
-        installed = next(l.split(":")[1].strip() for l in pac_out.splitlines() if l.startswith("Version"))
-        running = subprocess.check_output(["uname", "-r"], text=True).strip()
-        p_v, r_v = installed.replace('-', '.').split('.'), running.replace('-', '.').split('.')
-        mismatch = False
-        print(f"{'Component':<12} : {'Installed':<12} : {'Running'}")
-        print("─" * 45)
-        for lbl, p, r in zip(['Major', 'Minor', 'Patch', 'Arch Rel'], p_v, r_v):
-            if p != r: mismatch = True
-            print(f"{GREEN if p==r else RED}{lbl:<12} : {p:<12} {'==' if p==r else '!='} {r}{RESET}")
-        if mismatch:
-            issue_count += 1
-            print(f"\n{RED}{BOLD}![REBOOT REQUIRED]: Running kernel mismatch.{RESET}")
-    except: print(f"{RED}Kernel check failed.{RESET}")
+    def _kernel_dict(installed, running, mismatch, details=None, error=None):
+        return {
+            "installed": installed,
+            "running": running,
+            "mismatch": mismatch,
+            "details": details or [],
+            "error": error,
+            "status": "mismatch" if mismatch else "ok",
+            "issues": 1 if mismatch else 0
+        }
 
-def check_pacnew():
+    import traceback
+    def _parse_versions(installed, running):
+        p_v = installed.replace('-', '.').split('.')
+        r_v = running.replace('-', '.').split('.')
+        return p_v, r_v
+
+    def _labels():
+        return ['Major', 'Minor', 'Patch', 'Arch Rel']
+
+    def check_kernel_inner(as_dict=False):
+        try:
+            pac_out = subprocess.check_output(["pacman", "-Qi", "linux"], text=True)
+            installed = next(l.split(":")[1].strip() for l in pac_out.splitlines() if l.startswith("Version"))
+            running = subprocess.check_output(["uname", "-r"], text=True).strip()
+            p_v, r_v = _parse_versions(installed, running)
+            mismatch = False
+            details = []
+            for lbl, p, r in zip(_labels(), p_v, r_v):
+                if p != r:
+                    mismatch = True
+                details.append({"component": lbl, "installed": p, "running": r, "match": p == r})
+            if as_dict:
+                return _kernel_dict(installed, running, mismatch, details=details)
+            print_header("Kernel Version Check")
+            print(f"{'Component':<12} : {'Installed':<12} : {'Running'}")
+            print("─" * 45)
+            for d in details:
+                color = GREEN if d["match"] else RED
+                eq = '==' if d["match"] else '!='
+                print(f"{color}{d['component']:<12} : {d['installed']:<12} {eq} {d['running']}{RESET}")
+            if mismatch:
+                issue_count += 1
+                print(f"\n{RED}{BOLD}![REBOOT REQUIRED]: Running kernel mismatch.{RESET}")
+        except Exception as e:
+            if as_dict:
+                return _kernel_dict(None, None, True, error=str(e))
+            print(f"{RED}Kernel check failed.{RESET}")
+    return check_kernel_inner
+
+
+def check_pacnew(as_dict=False):
     global issue_count
-    print_header("Config Files (.pacnew)")
     found = [os.path.join(r, f) for r, _, fs in os.walk('/etc') for f in fs if f.endswith(('.pacnew', '.pacsave'))]
+    if as_dict:
+        result = {
+            "files": found,
+            "count": len(found),
+            "status": "pending" if found else "ok",
+            "issues": len(found) if found else 0
+        }
+        return result
+    print_header("Config Files (.pacnew)")
     if found:
         issue_count += len(found)
-        for f in found: print(f"{YELLOW}  -> {f}{RESET}")
-    else: print(f"{GREEN}No pending merges.{RESET}")
+        for f in found:
+            print(f"{YELLOW}  -> {f}{RESET}")
+    else:
+        print(f"{GREEN}No pending merges.{RESET}")
 
-def check_failed_services():
+def check_failed_services(as_dict=False):
     global issue_count
-    print_header("Failed Services")
     try:
         out = subprocess.check_output(["systemctl", "list-units", "--state=failed", "--plain", "--no-legend"], text=True).strip()
         if out:
             lines = out.splitlines()
+            if as_dict:
+                return {
+                    "failed_services": [line.split()[0] for line in lines],
+                    "count": len(lines),
+                    "status": "failed",
+                    "issues": len(lines)
+                }
             issue_count += len(lines)
-            for line in lines: print(f"{RED}  -> {line.split()[0]}{RESET}")
-        else: print(f"{GREEN}All units OK.{RESET}")
-    except: pass
+            print_header("Failed Services")
+            for line in lines:
+                print(f"{RED}  -> {line.split()[0]}{RESET}")
+        else:
+            if as_dict:
+                return {"failed_services": [], "count": 0, "status": "ok", "issues": 0}
+            print_header("Failed Services")
+            print(f"{GREEN}All units OK.{RESET}")
+    except Exception as e:
+        if as_dict:
+            return {"failed_services": [], "count": 0, "status": "error", "issues": 0, "error": str(e)}
+        pass
 
-def check_orphans():
-    print_header("Orphaned Packages")
+def check_orphans(as_dict=False):
     try:
         out = subprocess.check_output(["pacman", "-Qdtq"], text=True).strip()
-        if out: print(f"{YELLOW}Orphans: {out.replace(chr(10), ', ')}{RESET}")
-        else: print(f"{GREEN}No orphans.{RESET}")
-    except: print(f"{GREEN}No orphans.{RESET}")
+        if as_dict:
+            orphans = out.splitlines() if out else []
+            return {
+                "orphans": orphans,
+                "count": len(orphans),
+                "status": "found" if orphans else "ok",
+                "issues": len(orphans)
+            }
+        print_header("Orphaned Packages")
+        if out:
+            print(f"{YELLOW}Orphans: {out.replace(chr(10), ', ')}{RESET}")
+        else:
+            print(f"{GREEN}No orphans.{RESET}")
+    except Exception as e:
+        if as_dict:
+            return {"orphans": [], "count": 0, "status": "ok", "issues": 0, "error": str(e)}
+        print(f"{GREEN}No orphans.{RESET}")
 
-def check_stats():
-    print_header("Pacman Statistics")
+def check_stats(as_dict=False):
     try:
         def get_count(flags: str) -> int:
             try:
@@ -377,12 +501,24 @@ def check_stats():
         cache_path = "/var/cache/pacman/pkg"
         cache_size_str = "Unknown"
         if os.path.exists(cache_path):
-            # Using du -sh is the easiest way to get human-readable directory size
             try:
                 cache_out = subprocess.check_output(["du", "-sh", cache_path], text=True).split()[0]
                 cache_size_str = cache_out
-            except: pass
+            except Exception:
+                pass
 
+        if as_dict:
+            return {
+                "total": total,
+                "native": native,
+                "foreign": foreign,
+                "explicit": explicit,
+                "dependencies": deps,
+                "cache_size": cache_size_str,
+                "status": "ok",
+                "issues": 0
+            }
+        print_header("Pacman Statistics")
         print(f"{BOLD}{'Category':<18} : {'Count/Size'}{RESET}")
         print("─" * 35)
         print(f"{'Total Packages':<18} : {total}")
@@ -393,8 +529,9 @@ def check_stats():
         print(f"{'As Dependencies':<18} : {deps}")
         print("-" * 35)
         print(f"{'Pacman Cache Size':<18} : {YELLOW}{cache_size_str}{RESET}")
-        
     except Exception as e:
+        if as_dict:
+            return {"status": "error", "issues": 0, "error": str(e)}
         print(f"{RED}Could not retrieve stats: {e}{RESET}")
 
 # --- Main ---
@@ -505,11 +642,12 @@ def main():
         disk_flag = True if args.disk is True else False
         stats_flag = True if args.stats is True else False
 
+    import json
     checks = [
         (logo_flag, print_logo_info, 'logo'),
         (sensors_flag, check_sensors, 'sensors'),
         (smart_flag, check_smart, 'smart'),
-        (kernel_flag, check_kernel, 'kernel'),
+        (kernel_flag, check_kernel(), 'kernel'),
         (pacnew_flag, check_pacnew, 'pacnew'),
         (services_flag, check_failed_services, 'services'),
         (orphans_flag, check_orphans, 'orphans'),
@@ -517,19 +655,38 @@ def main():
         (stats_flag, check_stats, 'stats'),
     ]
 
-    enabled = [name for flag, _, name in checks if flag]
-    print(f"[DEBUG] Enabled checks: {enabled}")
+    # enabled = [name for flag, _, name in checks if flag]
+    # print(f"[DEBUG] Enabled checks: {enabled}")
 
-    for selected, func, _ in checks:
-        if selected:
-            func()
-
-    print_header("Summary")
-    if issue_count == 0:
-        print(f"{GREEN}{BOLD}✔ System Healthy: No issues detected.{RESET}")
+    if args.json:
+        results = {}
+        for selected, func, name in checks:
+            if selected:
+                # Only check_kernel supports as_dict for now
+                if name in ('kernel', 'smart', 'pacnew', 'services', 'orphans', 'stats', 'sensors'):
+                    # check_sensors needs temp_warn default
+                    if name == 'sensors':
+                        results[name] = func(as_dict=True)
+                    else:
+                        results[name] = func(as_dict=True)
+                else:
+                    results[name] = None
+        # Add summary
+        results['summary'] = {
+            'issues': sum((v.get('issues', 0) if isinstance(v, dict) else 0) for v in results.values() if v),
+            'status': 'ok' if all((v.get('status', 'ok') == 'ok' if isinstance(v, dict) else True) for v in results.values() if v) else 'attention',
+        }
+        print(json.dumps(results, indent=2))
     else:
-        print(f"{RED}{BOLD}✘ Attention Required: {issue_count} potential issue(s) found.{RESET}")
-    print("")
+        for selected, func, name in checks:
+            if selected:
+                func()
+        print_header("Summary")
+        if issue_count == 0:
+            print(f"{GREEN}{BOLD}✔ System Healthy: No issues detected.{RESET}")
+        else:
+            print(f"{RED}{BOLD}✘ Attention Required: {issue_count} potential issue(s) found.{RESET}")
+        print("")
 
 
 if __name__ == "__main__":
