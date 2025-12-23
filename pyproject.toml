@@ -3,7 +3,7 @@ name = "arch_check"
 version = "1.0.0"
 description = "Arch Linux system health and disk origin checker CLI."
 authors = [ { name = "kidpixo" } ]
-license = "MIT"
+license = "0BSD"
 readme = "README.md"
 requires-python = ">=3.8"
 

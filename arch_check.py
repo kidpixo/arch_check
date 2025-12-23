@@ -71,6 +71,7 @@ import sys
 import argparse
 import shutil
 import platform
+import logging
 
 # --- Configuration & Colors ---
 BLUE = '\033[34m'
@@ -214,153 +215,196 @@ def print_logo_info():
         text = data_lines[i] if i < len(data_lines) else ""
         print(f" {logo}   {text}")
 
-def check_disk():
-    global issue_count
-    print_header("Disk Usage & Origins")
-    critical_mounts = ['/', '/boot', '/home', '/var']
-    print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<20} : {'Subvol'}{RESET}")
-    print("─" * 140)
-
-    # Get mount -> fs type
-    with open('/proc/mounts', 'r') as f:
-        mount_data = {l.split()[1]: l.split()[2] for l in f if l.split()[1] in critical_mounts}
-
-    # Get lsblk info as JSON
+def check_disk(as_dict=False):
+    """Show disk usage, filesystem, device, and origin info for key mounts. Uses lsblk -f -J and /etc/fstab."""
     import json
-    lsblk_out = subprocess.check_output(["lsblk", "-J", "-o", "NAME,TYPE,MOUNTPOINT,FSTYPE"] , text=True)
-    blkinfo = json.loads(lsblk_out)["blockdevices"]
+    import shutil
+    import subprocess
+    import os
+    global issue_count
 
-    def find_chain_and_dev_by_mount(mount):
-        # Recursively walk lsblk tree to find the chain and device info for a mountpoint
-        def walk(dev, chain):
-            if dev.get("mountpoint") == mount:
-                return (chain + [dev["name"]], dev)
-            for child in dev.get("children", []):
-                result = walk(child, chain + [dev["name"]])
-                if result:
-                    return result
-            return None
-        for dev in blkinfo:
-            result = walk(dev, [])
-            if result:
-                return result
-        # Fallback: use findmnt to get device, then lsblk to get ancestry
-        try:
-            dev_path = subprocess.check_output(["findmnt", "-nno", "SOURCE", mount], text=True).strip()
-            # Remove /dev/ if present
-            dev_name = os.path.basename(dev_path)
-            # Recursively search for dev_name in blkinfo
-            def search_dev(devs, chain):
-                for dev in devs:
-                    if dev.get("name") == dev_name:
-                        return (chain + [dev["name"]], dev)
-                    if "children" in dev:
-                        result = search_dev(dev["children"], chain + [dev["name"]])
-                        if result:
-                            return result
-                return None
-            result = search_dev(blkinfo, [])
-            if result:
-                return result
-            # If still not found, just return the device name
-            return ([dev_name], {"name": dev_name, "fstype": "unknown", "type": "unknown"})
-        except Exception as e:
-            return ([], None)
+    import logging
+    try:
+        lsblk_out = subprocess.check_output(["lsblk", "-f", "-J"], text=True)
+        logging.debug(f"lsblk -f -J output: {lsblk_out}")
+        blkinfo = json.loads(lsblk_out)["blockdevices"]
+        logging.debug(f"Parsed blkinfo: {blkinfo}")
+    except Exception as e:
+        if as_dict:
+            return {"error": f"lsblk failed: {e}", "status": "error", "issues": 1}
+        print(f"{RED}lsblk failed: {e}{RESET}")
+        return
 
-    for mount in critical_mounts:
-        if mount not in mount_data:
-            # Only show as 'Not mounted' if it is a separate mount point in fstab or /proc/mounts
-            # Otherwise, skip it entirely
-            if mount == '/var':
-                try:
-                    with open('/etc/fstab', 'r') as fstab:
-                        found = any(line.strip() and not line.strip().startswith('#') and any(part == '/var' for part in line.split()) for line in fstab)
-                    if not found:
-                        continue
-                except Exception:
-                    continue
-            print(f"{mount:<15} : {YELLOW}Not mounted{RESET}")
+    # Parse /etc/fstab for subvolumes and mount options
+    fstab_info = {}
+    try:
+        with open('/etc/fstab', 'r') as fstab:
+            for line in fstab:
+                if line.strip() and not line.strip().startswith('#'):
+                    parts = line.split()
+                    if len(parts) > 3:
+                        fstab_info[parts[1]] = parts[3]
+        logging.debug(f"fstab_info: {fstab_info}")
+    except Exception as e:
+        logging.debug(f"Failed to parse /etc/fstab: {e}")
+
+    # Gather all mountpoints from lsblk and fstab
+    def collect_mountpoints_from_lsblk(devs):
+        mounts = set()
+        for dev in devs:
+            mps = dev.get('mountpoints', [])
+            if mps:
+                for mp in mps:
+                    if mp:
+                        mounts.add(mp)
+            if 'children' in dev and dev['children']:
+                mounts.update(collect_mountpoints_from_lsblk(dev['children']))
+        return mounts
+
+    lsblk_mounts = collect_mountpoints_from_lsblk(blkinfo)
+
+    # Also gather mountpoints from fstab (may include unmounted targets)
+    fstab_mounts = set(fstab_info.keys())
+
+    # Union of all mountpoints, sorted for display
+    all_mounts = sorted(lsblk_mounts | fstab_mounts)
+
+    results = []
+    def find_mount_and_chain(devs, mount, chain=None):
+        if chain is None:
+            chain = []
+        for dev in devs:
+            mps = dev.get('mountpoints', [])
+            mps = [mp for mp in mps if mp]
+            if mount in mps:
+                return dev, chain + [dev]
+            if "children" in dev and dev["children"]:
+                found, found_chain = find_mount_and_chain(dev["children"], mount, chain + [dev]) or (None, None)
+                if found:
+                    return found, found_chain
+        return None, None
+
+    # Filesystem types and mount names to skip
+    skip_fstypes = {
+        'swap', 'tmpfs', 'devtmpfs', 'proc', 'sysfs', 'cgroup', 'mqueue', 'hugetlbfs', 'fusectl', 'configfs', 'securityfs', 'pstore',
+        'efivarfs', 'debugfs', 'tracefs', 'ramfs', 'overlay', 'squashfs', 'autofs', 'binfmt_misc', 'bpf', 'nsfs',
+    }
+    skip_mounts = {'[SWAP]', 'none', ''}
+
+    # Parse df -h output for all mounts
+    df_info = {}
+    try:
+        df_out = subprocess.check_output(["df", "-hP"], text=True)
+        for line in df_out.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 6:
+                mp = parts[5]
+                df_info[mp] = {
+                    "use_percent": parts[4],
+                    "avail": parts[3]
+                }
+    except Exception as e:
+        logging.debug(f"Failed to parse df -h: {e}")
+
+    for mount in all_mounts:
+        # Find device info first to check fstype
+        dev_entry, chain = find_mount_and_chain(blkinfo, mount)
+        fstype = dev_entry.get("fstype", "") if dev_entry else ""
+        if fstype in skip_fstypes or mount in skip_mounts:
             continue
+
+        entry = {"mount": mount}
         try:
-            total, used, free = shutil.disk_usage(mount)
-            percent = (used / total) * 100
-            color = GREEN
-            if percent > 90:
-                color = RED
-                issue_count += 1
-            elif percent > 75:
-                color = YELLOW
-
-            # Find device info and origin chain
-            chain, dev_entry = find_chain_and_dev_by_mount(mount)
-            subvol = ""
-            # Try to get subvolume info for btrfs
-            try:
-                # Try findmnt with SUBVOL support, capture stderr too
-                findmnt_out = subprocess.check_output(["findmnt", "-nno", "SOURCE,SUBVOL", mount], text=True, stderr=subprocess.STDOUT).strip()
-                if 'unknown column' in findmnt_out or 'findmnt:' in findmnt_out:
-                    raise Exception('findmnt SUBVOL not supported')
-                parts = findmnt_out.split()
-                dev_path = parts[0] if parts else ""
-                subvol = parts[1] if len(parts) > 1 else ""
-            except Exception:
-                # Fallback: get device only
+            # Btrfs-specific reporting (optional, but will be overwritten by df below)
+            if fstype == "btrfs":
                 try:
-                    dev_path_raw = subprocess.check_output(["findmnt", "-nno", "SOURCE", mount], text=True).strip()
-                    # If output is /dev/xxx[subvol], parse device and subvol
-                    import re
-                    m = re.match(r"(/dev/\S+)(\[(.+)\])?", dev_path_raw)
-                    if m:
-                        dev_path = m.group(1)
-                        subvol = m.group(3) if m.group(3) else ""
+                    btrfs_out = subprocess.check_output(["btrfs", "filesystem", "usage", "-b", mount], text=True)
+                    total_bytes = used_bytes = free_bytes = None
+                    for line in btrfs_out.splitlines():
+                        if "Device size:" in line:
+                            total_bytes = int(line.split(":",1)[1].strip().split()[0])
+                        elif "Used:" in line and "Device size:" not in line:
+                            used_bytes = int(line.split(":",1)[1].strip().split()[0])
+                        elif "Free (estimated):" in line:
+                            free_bytes = int(line.split(":",1)[1].strip().split()[0])
+                    if total_bytes and used_bytes is not None:
+                        percent = (used_bytes / total_bytes) * 100
+                        entry["usage_percent"] = round(percent, 1)
+                        entry["free_gb"] = round((total_bytes - used_bytes)/(2**30), 2)
+                    elif total_bytes and free_bytes is not None:
+                        percent = (1 - (free_bytes / total_bytes)) * 100
+                        entry["usage_percent"] = round(percent, 1)
+                        entry["free_gb"] = round(free_bytes/(2**30), 2)
                     else:
-                        dev_path = dev_path_raw
-                        subvol = ""
-                except Exception:
-                    dev_path = f"/dev/{dev_entry['name']}" if dev_entry and 'name' in dev_entry else ""
-                    subvol = ""
-                # Try to get subvol from /etc/fstab if not found
-                if not subvol:
-                    try:
-                        with open('/etc/fstab', 'r') as fstab:
-                            for line in fstab:
-                                if line.strip() and not line.strip().startswith('#') and mount in line:
-                                    opts = line.split()
-                                    if len(opts) > 3:
-                                        for opt in opts[3].split(','):
-                                            if opt.startswith('subvol='):
-                                                subvol = opt.split('=',1)[1]
-                    except Exception:
-                        pass
-            # If btrfs, always use the real block device for device/origin
-            if dev_entry and (dev_entry.get('fstype', '') == 'btrfs' or (dev_path and dev_path and dev_path.startswith('/dev/') and 'btrfs' in (dev_entry.get('fstype', '') or ''))):
-                # Clean trailing ']' from device and origin if present
-                device = dev_path.rstrip(']') if dev_path.endswith(']') else dev_path
-                dev_name = os.path.basename(device)
-                def search_dev(devs, chain):
-                    for dev in devs:
-                        if dev.get("name") == dev_name:
-                            return chain + [dev["name"]]
-                        if "children" in dev:
-                            result = search_dev(dev["children"], chain + [dev["name"]])
-                            if result:
-                                return result
-                    return None
-                origin_chain = search_dev(blkinfo, [])
-                origin = '.'.join(origin_chain) if origin_chain else dev_name
-                # Remove trailing ']' from origin if present
-                origin = origin.rstrip(']') if origin.endswith(']') else origin
-                fstype = 'btrfs'
-                dtype = dev_entry.get('type', 'unknown') if dev_entry else 'unknown'
+                        entry["usage_percent"] = "?"
+                        entry["free_gb"] = "?"
+                except Exception as e:
+                    entry["usage_percent"] = "?"
+                    entry["free_gb"] = "?"
+                    entry["btrfs_error"] = str(e)
+                entry["status"] = "ok"
             else:
-                device = f"/dev/{dev_entry['name']}" if dev_entry and 'name' in dev_entry else ""
-                fstype = dev_entry.get('fstype', 'unknown') if dev_entry else 'unknown'
-                dtype = dev_entry.get('type', 'unknown') if dev_entry else 'unknown'
-                origin = '.'.join(chain) if chain else (dev_entry.get('name', 'unknown') if dev_entry else 'unknown')
+                entry["usage_percent"] = "?"
+                entry["free_gb"] = "?"
+                entry["status"] = "ok"
 
-            print(f"{mount:<15} : {color}{percent:>6.1f}%{RESET} : {free/(2**30):>7.2f} GB : {fstype:<8} : {dtype:<10} : {device:<22} : {origin:<20} : {subvol}")
+
+            # Overwrite usage and free with df info only for non-Btrfs filesystems
+            if fstype != "btrfs" and mount in df_info:
+                try:
+                    entry["usage_percent"] = float(df_info[mount]["use_percent"].strip('%'))
+                except Exception:
+                    entry["usage_percent"] = df_info[mount]["use_percent"]
+                entry["free_gb"] = df_info[mount]["avail"]
+
+            if entry["usage_percent"] != "?" and isinstance(entry["usage_percent"], float):
+                if entry["usage_percent"] > 90:
+                    entry["status"] = "critical"
+                    issue_count += 1
+                elif entry["usage_percent"] > 75:
+                    entry["status"] = "warn"
+
+            logging.debug(f"Searching for mount '{mount}' in blkinfo")
+            # dev_entry, chain already found above
+            logging.debug(f"Result for mount '{mount}': dev_entry={dev_entry}, chain={chain}")
+            # Device path
+            device = f"/dev/{dev_entry['name']}" if dev_entry and 'name' in dev_entry else "?"
+            entry["device"] = device
+            # Filesystem
+            entry["fstype"] = fstype if fstype else "?"
+            # Type: use 'fsver' if present, else 'type' (lsblk -f -J may not have 'type')
+            entry["type"] = dev_entry.get("fsver") or dev_entry.get("type", "?") if dev_entry else "?"
+            # Label
+            entry["label"] = dev_entry.get("label", "") if dev_entry else ""
+            # Origin chain (skip the mount leaf, join parent names)
+            if chain:
+                origin = '.'.join([d['name'] for d in chain])
+            else:
+                origin = dev_entry['name'] if dev_entry and 'name' in dev_entry else "?"
+            entry["origin"] = origin
+            # Subvolume from fstab only
+            subvol = ""
+            opts = fstab_info.get(mount, "")
+            for opt in opts.split(','):
+                if opt.startswith('subvol='):
+                    subvol = opt.split('=',1)[1]
+            entry["subvol"] = subvol
         except Exception as e:
-            print(f"{mount:<15} : {RED}Error: {e}{RESET}")
+            entry["status"] = "error"
+            entry["error"] = str(e)
+            logging.debug(f"Error processing mount '{mount}': {e}")
+        results.append(entry)
+
+    if as_dict:
+        return {"mounts": results, "status": "ok", "issues": sum(1 for e in results if e.get("status") == "critical")}
+    print_header("Disk Usage & Origins")
+    print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<36} : {'Subvol'}{RESET}")
+    print("─" * 140)
+    for entry in results:
+        color = GREEN if entry["status"] == "ok" else (YELLOW if entry["status"] == "warn" else RED)
+        def safe(val, default="?"):
+            return str(val) if val is not None else default
+        print(f"{safe(entry['mount']):<15} : {color}{safe(entry.get('usage_percent')):>6}%{RESET} : {safe(entry.get('free_gb')):>7} GB : {safe(entry.get('fstype')):<8} : {safe(entry.get('type')):<10} : {safe(entry.get('device')):<22} : {safe(entry.get('origin')):<36} : {safe(entry.get('subvol'),'')}")
 
 def check_kernel():
     global issue_count
@@ -502,10 +546,15 @@ def check_stats(as_dict=False):
         cache_size_str = "Unknown"
         if os.path.exists(cache_path):
             try:
-                cache_out = subprocess.check_output(["du", "-sh", cache_path], text=True).split()[0]
-                cache_size_str = cache_out
+                import sys
+                du_proc = subprocess.run(["du", "-sh", cache_path], text=True, capture_output=True)
+                if du_proc.returncode == 0:
+                    cache_size_str = du_proc.stdout.split()[0]
+                else:
+                    print(du_proc.stderr, file=sys.stderr, end="")
+                    cache_size_str = "Unknown (run with sudo to read /var/cache/pacman/pkg/ with du)"
             except Exception:
-                pass
+                cache_size_str = "Unknown (run with sudo to read /var/cache/pacman/pkg/ with du)"
 
         if as_dict:
             return {
@@ -597,13 +646,17 @@ def main():
     _ = group_smart.add_argument("--no-smart", dest="smart", action="store_false", default=None, help=argparse.SUPPRESS)
     _ = parser.add_argument("-a", "--all", action="store_true", help="Perform all health checks and show logo")
     _ = parser.add_argument("-j","--json", action="store_true", help="Output all results in JSON format for further processing")
+    _ = parser.add_argument("--log-level", default="WARNING", help="Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
     # Custom help output for compact style
     parser.usage = None
     parser.formatter_class = lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=32)
     
     args = parser.parse_args()
-    
+    # Set up logging
+    log_level = getattr(logging, str(args.log_level).upper(), logging.WARNING)
+    logging.basicConfig(level=log_level, format='[%(levelname)s] %(message)s')
+    logger = logging.getLogger(__name__)
     # 2. Help/Early Exit Check
     if len(sys.argv) == 1:
         parser.print_help()
@@ -655,15 +708,15 @@ def main():
         (stats_flag, check_stats, 'stats'),
     ]
 
-    # enabled = [name for flag, _, name in checks if flag]
-    # print(f"[DEBUG] Enabled checks: {enabled}")
+    enabled = [name for flag, _, name in checks if flag]
+    logger.debug(f"[DEBUG] Enabled checks: {enabled}")
 
     if args.json:
         results = {}
         for selected, func, name in checks:
             if selected:
-                # Only check_kernel supports as_dict for now
-                if name in ('kernel', 'smart', 'pacnew', 'services', 'orphans', 'stats', 'sensors'):
+                # All checks that support as_dict should use it
+                if name in ('kernel', 'smart', 'pacnew', 'services', 'orphans', 'stats', 'sensors', 'disk'):
                     # check_sensors needs temp_warn default
                     if name == 'sensors':
                         results[name] = func(as_dict=True)

@@ -44,4 +44,5 @@ This will install the CLI as `/usr/bin/arch_check`.
 - lm_sensors, smartmontools, systemd, pacman
 
 ## License
-MIT
+
+0BSD

@@ -1,10 +1,10 @@
-pkgbase = arch_check
+pkgbase = arch-check
 	pkgdesc = Arch Linux system health and disk origin checker CLI
 	pkgver = 1.0.0
 	pkgrel = 1
 	url = https://github.com/kidpixo/arch-check
 	arch = any
-	license = MIT
+	license = 0BSD
 	makedepends = python-build
 	makedepends = python-installer
 	makedepends = python-wheel
@@ -12,7 +12,7 @@ pkgbase = arch_check
 	depends = python
 	source = arch_check.py
 	source = pyproject.toml
-	md5sums = 5e7a064e0917ca23797efa577e4a8056
-	md5sums = 7bdec62ca089d089b20c62cf01ffb98f
+	sha256sums = 65a694cbc1264cee693802d85d5fdf2b20cf05bfb1895e48bb30e8310ed46b6c
+	sha256sums = c7b09c9af408036d3aa2ee7e19fbf009f90fd14e05073434bd21d5922d2930d4
 
-pkgname = arch_check
+pkgname = arch-check
