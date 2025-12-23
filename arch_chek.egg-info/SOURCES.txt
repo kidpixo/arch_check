@@ -1,7 +1,0 @@
-arch_check.py
-pyproject.toml
-arch_check.egg-info/PKG-INFO
-arch_check.egg-info/SOURCES.txt
-arch_check.egg-info/dependency_links.txt
-arch_check.egg-info/entry_points.txt
-arch_check.egg-info/top_level.txt

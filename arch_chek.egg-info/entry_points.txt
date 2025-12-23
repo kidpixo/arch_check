@@ -1,2 +1,0 @@
-[console_scripts]
-arch_check = arch_check:main

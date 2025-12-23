@@ -431,17 +431,40 @@ def main():
         """
     )
 
-    _ = parser.add_argument("-l", "--logo", action="store_true", help="Print the Arch logo and hardware summary")
-    _ = parser.add_argument("--sensors", action="store_true", help="Show all available temperature sensors and warn if high")
-    _ = parser.add_argument("-k", "--kernel", action="store_true", help="Check for kernel/running version mismatch")
-    _ = parser.add_argument("-p", "--pacnew", action="store_true", help="Scan for unmerged .pacnew config files")
-    _ = parser.add_argument("-s", "--services", action="store_true", help="List failed systemd services")
-    _ = parser.add_argument("-o", "--orphans", action="store_true", help="List orphaned packages (unused dependencies)")
-    _ = parser.add_argument("-d", "--disk", action="store_true", help="Show usage, filesystem type, and LVM/LUKS origin")
+    group_logo = parser.add_mutually_exclusive_group()
+    _ = group_logo.add_argument("-l", "--logo", dest="logo", action="store_true", default=None, help="Print the Arch logo and hardware summary [--no-logo to suppress]")
+    _ = group_logo.add_argument("--no-logo", dest="logo", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_sensors = parser.add_mutually_exclusive_group()
+    _ = group_sensors.add_argument("--sensors", dest="sensors", action="store_true", default=None, help="Show all available temperature sensors and warn if high [--no-sensors to suppress]")
+    _ = group_sensors.add_argument("--no-sensors", dest="sensors", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_kernel = parser.add_mutually_exclusive_group()
+    _ = group_kernel.add_argument("-k", "--kernel", dest="kernel", action="store_true", default=None, help="Check for kernel/running version mismatch [--no-kernel to suppress]")
+    _ = group_kernel.add_argument("--no-kernel", dest="kernel", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_pacnew = parser.add_mutually_exclusive_group()
+    _ = group_pacnew.add_argument("-p", "--pacnew", dest="pacnew", action="store_true", default=None, help="Scan for unmerged .pacnew config files [--no-pacnew to suppress]")
+    _ = group_pacnew.add_argument("--no-pacnew", dest="pacnew", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_services = parser.add_mutually_exclusive_group()
+    _ = group_services.add_argument("-s", "--services", dest="services", action="store_true", default=None, help="List failed systemd services [--no-services to suppress]")
+    _ = group_services.add_argument("--no-services", dest="services", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_orphans = parser.add_mutually_exclusive_group()
+    _ = group_orphans.add_argument("-o", "--orphans", dest="orphans", action="store_true", default=None, help="List orphaned packages (unused dependencies) [--no-orphans to suppress]")
+    _ = group_orphans.add_argument("--no-orphans", dest="orphans", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_disk = parser.add_mutually_exclusive_group()
+    _ = group_disk.add_argument("-d", "--disk", dest="disk", action="store_true", default=None, help="Show usage, filesystem type, and LVM/LUKS origin [--no-disk to suppress]")
+    _ = group_disk.add_argument("--no-disk", dest="disk", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_stats = parser.add_mutually_exclusive_group()
+    _ = group_stats.add_argument("-t", "--stats", dest="stats", action="store_true", default=None, help="Show pacman package statistics (Native vs AUR) [--no-stats to suppress]")
+    _ = group_stats.add_argument("--no-stats", dest="stats", action="store_false", default=None, help=argparse.SUPPRESS)
+    group_smart = parser.add_mutually_exclusive_group()
+    _ = group_smart.add_argument("--smart", dest="smart", action="store_true", default=None, help="Show SMART disk health summary (if supported) [--no-smart to suppress]")
+    _ = group_smart.add_argument("--no-smart", dest="smart", action="store_false", default=None, help=argparse.SUPPRESS)
     _ = parser.add_argument("-a", "--all", action="store_true", help="Perform all health checks and show logo")
-    _ = parser.add_argument("-t", "--stats", action="store_true", help="Show pacman package statistics (Native vs AUR)")
-    _ = parser.add_argument("--smart", action="store_true", help="Show SMART disk health summary (if supported)")
+    _ = parser.add_argument("-j","--json", action="store_true", help="Output all results in JSON format for further processing")
 
+    # Custom help output for compact style
+    parser.usage = None
+    parser.formatter_class = lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=32)
+    
     args = parser.parse_args()
     
     # 2. Help/Early Exit Check
@@ -458,21 +481,47 @@ def main():
 # 4. Proceed with checks...
 
 
+    global issue_count
+    issue_count = 0
+    # Merge --feature/--no-feature into a single flag for each feature
+    if args.all:
+        logo_flag = True if args.logo is not False else False
+        sensors_flag = True if args.sensors is not False else False
+        smart_flag = True if args.smart is not False else False
+        kernel_flag = True if args.kernel is not False else False
+        pacnew_flag = True if args.pacnew is not False else False
+        services_flag = True if args.services is not False else False
+        orphans_flag = True if args.orphans is not False else False
+        disk_flag = True if args.disk is not False else False
+        stats_flag = True if args.stats is not False else False
+    else:
+        logo_flag = True if args.logo is True else False
+        sensors_flag = True if args.sensors is True else False
+        smart_flag = True if args.smart is True else False
+        kernel_flag = True if args.kernel is True else False
+        pacnew_flag = True if args.pacnew is True else False
+        services_flag = True if args.services is True else False
+        orphans_flag = True if args.orphans is True else False
+        disk_flag = True if args.disk is True else False
+        stats_flag = True if args.stats is True else False
+
     checks = [
-        (getattr(args, 'logo', False), print_logo_info),
-        (getattr(args, 'sensors', False), check_sensors),
-        (getattr(args, 'smart', False), check_smart),
-        (getattr(args, 'kernel', False), check_kernel),
-        (getattr(args, 'pacnew', False), check_pacnew),
-        (getattr(args, 'services', False), check_failed_services),
-        (getattr(args, 'orphans', False), check_orphans),
-        (getattr(args, 'disk', False), check_disk),
-        (getattr(args, 'stats', False), check_stats),
+        (logo_flag, print_logo_info, 'logo'),
+        (sensors_flag, check_sensors, 'sensors'),
+        (smart_flag, check_smart, 'smart'),
+        (kernel_flag, check_kernel, 'kernel'),
+        (pacnew_flag, check_pacnew, 'pacnew'),
+        (services_flag, check_failed_services, 'services'),
+        (orphans_flag, check_orphans, 'orphans'),
+        (disk_flag, check_disk, 'disk'),
+        (stats_flag, check_stats, 'stats'),
     ]
 
+    enabled = [name for flag, _, name in checks if flag]
+    print(f"[DEBUG] Enabled checks: {enabled}")
 
-    for selected, func in checks:
-        if getattr(args, 'all', False) or selected:
+    for selected, func, _ in checks:
+        if selected:
             func()
 
     print_header("Summary")
