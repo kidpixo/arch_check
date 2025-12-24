@@ -59,25 +59,32 @@ This installs the CLI as `/usr/bin/arch_check`.
 
 ### Quick Start
 
+Available switches :
+
 ```sh
-arch_check -a           # Run all checks and show summary
-arch_check -d           # Show disk usage and device origins
-arch_check --sensors    # Show temperature sensors
-arch_check --smart      # Show SMART disk health
-arch_check -k           # Check kernel version
-arch_check -p           # Scan for .pacnew config files
-arch_check -s           # List failed systemd services
-arch_check -o           # List orphaned packages
-arch_check -t           # Show pacman statistics
-arch_check --json       # Output all results as JSON
-arch_check --help       # Show all options
+  -h, --help             show this help message and exit
+  -l, --logo             Print the Arch logo and hardware summary [--no-logo to suppress]
+  --sensors              Show all available temperature sensors and warn if high [--no-sensors to suppress]
+  -k, --kernel           Check for kernel/running version mismatch [--no-kernel to suppress]
+  -p, --pacnew           Scan for unmerged .pacnew config files [--no-pacnew to suppress]
+  -s, --services         List failed systemd services [--no-services to suppress]
+  -o, --orphans          List orphaned packages (unused dependencies) [--no-orphans to suppress]
+  -d, --disk             Show usage, filesystem type, and LVM/LUKS origin [--no-disk to suppress]
+  -t, --stats            Show pacman package statistics (Native vs AUR) [--no-stats to suppress]
+  --smart                Show SMART disk health summary (if supported) [--no-smart to suppress]
+  -a, --all              Perform all health checks and show logo
+  -j, --json             Output all results in JSON format for further processing
+  --log-level LOG_LEVEL  Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  --color                Enable colored output (default if terminal)
+  --no-color             Disable colored output (default if piped)
 ```
 
 ---
 
 ## Switches & Examples
 
-Each switch can be combined or used alone. Here are the main options, with real output examples:
+Each switch can be combined or used alone, most of them have a --no-SWITCH equivalent to switch off , useful to run -a,--all and leave a few off. 
+Here are the main options, with real output examples:
 
 ### `-d`, `--disk`  
 **Show disk usage, filesystem, device, and origin.**
