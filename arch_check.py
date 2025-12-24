@@ -65,6 +65,7 @@ def check_smart(as_dict=False):
             return {"devices": [], **summary}
         print(f"{RED}SMART summary failed: {e}{RESET}")
 #!/usr/bin/env python3
+
 import subprocess
 import os
 import sys
@@ -73,14 +74,27 @@ import shutil
 import platform
 import logging
 
+# Color control
+def get_colors(enable=True):
+    if enable:
+        return {
+            'BLUE': '\033[34m',
+            'CYAN': '\033[36m',
+            'RED': '\033[31m',
+            'GREEN': '\033[32m',
+            'YELLOW': '\033[33m',
+            'BOLD': '\033[1m',
+            'RESET': '\033[0m',
+        }
+    else:
+        return {k: '' for k in ['BLUE','CYAN','RED','GREEN','YELLOW','BOLD','RESET']}
+
+
+
+
 # --- Configuration & Colors ---
-BLUE = '\033[34m'
-CYAN = '\033[36m'
-RED = '\033[31m'
-GREEN = '\033[32m'
-YELLOW = '\033[33m'
-BOLD = '\033[1m'
-RESET = '\033[0m'
+# These will be set in main() based on --color/--no-color
+BLUE = CYAN = RED = GREEN = YELLOW = BOLD = RESET = ''
 
 # The high-detail ASCII logo provided from https://github.com/deater/linux_logo
 ARCH_LOGO = [
@@ -617,6 +631,7 @@ def main():
         """
     )
 
+
     group_logo = parser.add_mutually_exclusive_group()
     _ = group_logo.add_argument("-l", "--logo", dest="logo", action="store_true", default=None, help="Print the Arch logo and hardware summary [--no-logo to suppress]")
     _ = group_logo.add_argument("--no-logo", dest="logo", action="store_false", default=None, help=argparse.SUPPRESS)
@@ -647,6 +662,12 @@ def main():
     _ = parser.add_argument("-a", "--all", action="store_true", help="Perform all health checks and show logo")
     _ = parser.add_argument("-j","--json", action="store_true", help="Output all results in JSON format for further processing")
     _ = parser.add_argument("--log-level", default="WARNING", help="Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+    import sys
+    color_group = parser.add_mutually_exclusive_group()
+    # Default: color if stdout is a terminal, no color if piped
+    default_color = sys.stdout.isatty()
+    color_group.add_argument('--color', dest='color', action='store_true', default=None, help='Enable colored output (default if terminal)')
+    color_group.add_argument('--no-color', dest='color', action='store_false', default=None, help='Disable colored output (default if piped)')
 
     # Custom help output for compact style
     parser.usage = None
@@ -657,6 +678,20 @@ def main():
     log_level = getattr(logging, str(args.log_level).upper(), logging.WARNING)
     logging.basicConfig(level=log_level, format='[%(levelname)s] %(message)s')
     logger = logging.getLogger(__name__)
+
+    # Determine color: explicit flag wins, else auto-detect
+    if args.color is not None:
+        use_color = args.color
+    else:
+        use_color = default_color
+    colors = get_colors(use_color)
+    globals()['BLUE'] = colors['BLUE']
+    globals()['CYAN'] = colors['CYAN']
+    globals()['RED'] = colors['RED']
+    globals()['GREEN'] = colors['GREEN']
+    globals()['YELLOW'] = colors['YELLOW']
+    globals()['BOLD'] = colors['BOLD']
+    globals()['RESET'] = colors['RESET']
     # 2. Help/Early Exit Check
     if len(sys.argv) == 1:
         parser.print_help()

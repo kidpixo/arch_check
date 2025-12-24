@@ -1,0 +1,229 @@
+system with ext4
+
+cat /etc/fstab
+
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/nvme0n1p1
+UUID=3899-66A3          /boot           vfat            rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro   0 2
+#nvme0n1p2       crypto_LUKS 2              485600a1-2100-4528-ab4f-cff1bbc73f59
+# /dev/mapper/volume-root
+UUID=f8a314e1-9641-45bf-8e1a-4faf48eb1497       /               ext4            rw,relatime,stripe=8191 0 1
+# /dev/mapper/volume-home
+UUID=d12dc745-31e2-4969-b534-2bc30ea77acb       /home           ext4            rw,relatime,stripe=8191 0 2
+# /dev/mapper/volume-swap
+UUID=f2b388c1-4d64-49f4-aa69-e348b01d81e3       none            swap            defaults        0 0
+
+
+
+i:$ lsblk -f
+NAME              FSTYPE      FSVER    LABEL UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+nvme0n1
+├─nvme0n1p1       vfat        FAT32          3899-66A3                               369.8M    28% /boot
+└─nvme0n1p2       crypto_LUKS 2              485600a1-2100-4528-ab4f-cff1bbc73f59
+  └─cryptlvm      LVM2_member LVM2 001       5AbsRQ-V9Fl-ySxZ-SM6Q-tvvS-sRH9-qGzCid
+    ├─volume-swap swap        1              f2b388c1-4d64-49f4-aa69-e348b01d81e3                  [SWAP]
+    ├─volume-root ext4        1.0            f8a314e1-9641-45bf-8e1a-4faf48eb1497    126.7G    30% /
+    └─volume-home ext4        1.0            d12dc745-31e2-4969-b534-2bc30ea77acb    908.2G    38% /home
+
+
+                    -`         kidpixo@archp14s
+                   .o+`        ────────────────
+                  `ooo/        OS: Arch Linux
+                 `+oooo:       Kernel: 6.18.1-arch1-2
+                `+oooooo:      Shell: bash
+                -+oooooo+:     CPU: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+              `/:-:++oooo+:    Memory: 8124MiB / 29794MiB
+             `/++++/+++++++:   
+            `/++++++++++++++:   
+           `/+++++oooooooooo/`   
+          ./ooosssso++osssssso+`   
+         .oossssso-````/ossssss+`   
+        -osssssso.      :ssssssso.   
+       :osssssss/        osssso+++.   
+      /ossssssss/        +ssssooo/-   
+    `/ossssso+/:-        -:/+osssso+-   
+   `+sso+:-`                 `.-/+oso:   
+  `++:.                           `-/+/    
+     [ logo from deater/linux_logo ]   
+temp1:        +45.0°C
+temp3:         +0.0°C
+temp4:         +0.0°C
+temp5:         +0.0°C
+temp6:         +0.0°C
+temp7:         +0.0°C
+temp1:        +54.0°C
+
+========== Temperature & Sensors ==========
+/dev/nvme0n1: SMART not available or permission denied.
+
+========== SMART Disk Health Summary ==========
+
+========== Kernel Version Check ==========
+Component    : Installed    : Running
+─────────────────────────────────────────────
+Major        : 6            == 6
+Minor        : 18           == 18
+Patch        : 2            != 1
+Arch Rel     : arch2        != arch1
+Kernel check failed.
+
+========== Config Files (.pacnew) ==========
+  -> /etc/pacman.conf.pacnew
+  -> /etc/makepkg.conf.pacnew
+  -> /etc/makepkg.conf.d/fortran.conf.pacnew
+  -> /etc/pulse/default.pa.pacnew
+  -> /etc/pulse/default.pa.pacsave
+
+========== Failed Services ==========
+All units OK.
+
+========== Orphaned Packages ==========
+Orphans: adobe-source-code-pro-fonts, appstream-glib, aribb24, audiofile, botan2, box2d, bridge-utils, cantarell-fonts, cni-plugins, debugedit, duckdb-bin-debug, ffmpeg4.4, jqp-debug, kguiaddons5, libdca, libdvbpsi, libinstpatch, libmpeg2, libomxil-bellagio, libspatialindex, libtar, libxdg-basedir, mathjax, mbedtls2, pandoc-bin-debug, patchelf, physfs, pyqt-builder, python-async-timeout, python-coverage, python-docopt, python-ordered-set, python-pyproj, python-pyrsistent, python-pytz, python-toml, python-tomli, python-tzlocal, python-validate-pyproject, qt5-script, qt5-webengine, qt6-wayland, reiserfsprogs-debug, sdl2_ttf, ventoy-bin-debug, vulkan-headers, wpebackend-fdo, yay-debug
+
+========== Disk Usage & Origins ==========
+Mount           : Usage    : Free       : FS       : Type       : Device                 : Origin                               : Subvol
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/               :   32.0% :    127G GB : ext4     : 1.0        : /dev/volume-root       : nvme0n1.nvme0n1p2.cryptlvm.volume-root : 
+/boot           :   28.0% :    370M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    : 
+/home           :   41.0% :    909G GB : ext4     : 1.0        : /dev/volume-home       : nvme0n1.nvme0n1p2.cryptlvm.volume-home : 
+
+========== Pacman Statistics ==========
+Category           : Count/Size
+───────────────────────────────────
+Total Packages     : 1876
+  ┗━ Native        : 1788
+  ┗━ Foreign/AUR   : 88
+-----------------------------------
+Explicitly Sourced : 432
+As Dependencies    : 1444
+-----------------------------------
+Pacman Cache Size  : Unknown (run with sudo to read /var/cache/pacman/pkg/ with du)
+
+========== Summary ==========
+✘ Attention Required: 5 potential issue(s) found.
+
+system btrfs
+
+i:$ cat /etc/fstab
+# Static information about the filesystems.
+# See fstab(5) for details.
+
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/sda2
+UUID=3e0359f7-c513-405f-98df-1008472a566e       /               btrfs           rw,relatime,ssd,space_cache=v2,subvolid=256,subvol=/@   0 0
+# /dev/sda2
+UUID=3e0359f7-c513-405f-98df-1008472a566e       /home           btrfs           rw,relatime,ssd,space_cache=v2,subvolid=258,subvol=/@home       0 0
+# /dev/sda2
+UUID=3e0359f7-c513-405f-98df-1008472a566e       /var/cache/pacman/pkg   btrfs           rw,relatime,ssd,space_cache=v2,subvolid=260,subvol=/@pkg        0 0
+# /dev/sda2
+UUID=3e0359f7-c513-405f-98df-1008472a566e       /var/log        btrfs           rw,relatime,ssd,space_cache=v2,subvolid=259,subvol=/@log        0 0
+# /dev/sda1
+UUID=BFFD-2BEA          /boot           vfat            rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro   0 2
+# /dev/sda2
+UUID=3e0359f7-c513-405f-98df-1008472a566e       /.snapshots     btrfs           rw,relatime,ssd,space_cache=v2,subvolid=257,subvol=/@.snapshots 0 0
+
+i:$ lsblk -f
+NAME        FSTYPE                        FSVER LABEL UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+sda         promise_fasttrack_raid_member
+└─sda1      ext4                          1.0   1tb   2309759d-ffa3-44dc-960c-b060401f66c6  860.8G    48% /media/1tb
+sdb
+└─sdb1      ext4                          1.0   1tb_2 4e295ce3-d249-4dbf-92f5-f5e1710b5fe1  858.1G    48% /media/1tb_2
+zram0       swap                          1     zram0 5110452e-a0b8-478c-8734-df1c999f0b9d                [SWAP]
+nvme0n1
+├─nvme0n1p1 vfat                          FAT32       BFFD-2BEA                             132.3M    74% /boot
+└─nvme0n1p2 btrfs                                     3e0359f7-c513-405f-98df-1008472a566e  798.4G    14% /var/log
+                                                                                                          /var/cache/pacman/pkg
+                                                                                                          /.snapshots
+                                                                                                          /home
+                                                                                                          /
+
+
+                    -`         nas@nas
+                   .o+`        ───────
+                  `ooo/        OS: Arch Linux
+                 `+oooo:       Kernel: 6.17.2-arch1-1
+                `+oooooo:      Shell: bash
+                -+oooooo+:     CPU: Intel(R) Pentium(R) Silver N5000 CPU
+              `/:-:++oooo+:    Memory: 4290MiB / 7734MiB
+             `/++++/+++++++:
+            `/++++++++++++++:
+           `/+++++oooooooooo/`
+          ./ooosssso++osssssso+`
+         .oossssso-````/ossssss+`
+        -osssssso.      :ssssssso.
+       :osssssss/        osssso+++.
+      /ossssssss/        +ssssooo/-
+    `/ossssso+/:-        -:/+osssso+-
+   `+sso+:-`                 `.-/+oso:
+  `++:.                           `-/+/
+     [ logo from deater/linux_logo ]
+Package id 0:  +43.0°C  (high = +105.0°C, crit = +105.0°C)
+Core 0:        +43.0°C  (high = +105.0°C, crit = +105.0°C)
+Core 1:        +42.0°C  (high = +105.0°C, crit = +105.0°C)
+Core 2:        +42.0°C  (high = +105.0°C, crit = +105.0°C)
+Core 3:        +42.0°C  (high = +105.0°C, crit = +105.0°C)
+
+========== Temperature & Sensors ==========
+/dev/sdb: SMART not available or permission denied.
+/dev/sda: SMART not available or permission denied.
+/dev/nvme0n1: SMART not available or permission denied.
+
+========== SMART Disk Health Summary ==========
+
+========== Kernel Version Check ==========
+Component    : Installed    : Running
+─────────────────────────────────────────────
+Major        : 6            == 6
+Minor        : 17           == 17
+Patch        : 2            == 2
+Arch Rel     : arch1        == arch1
+
+========== Config Files (.pacnew) ==========
+  -> /etc/passwd.pacnew
+  -> /etc/shells.pacnew
+  -> /etc/makepkg.conf.pacnew
+  -> /etc/locale.gen.pacnew
+  -> /etc/mkinitcpio.conf.pacnew
+  -> /etc/pacman.d/mirrorlist.pacnew
+  -> /etc/systemd/resolved.conf.pacnew
+  -> /etc/systemd/timesyncd.conf.pacnew
+  -> /etc/makepkg.conf.d/rust.conf.pacnew
+
+========== Failed Services ==========
+  -> docker-compose@jellifyn.service
+
+========== Orphaned Packages ==========
+Orphans: argon2, asciidoc, bridge-utils, db, dmraid, go, gptfdisk, http-parser, intltool, ldns, libomxil-bellagio, libsm, podman-dnsname, python-cachecontrol, python-dateutil, python-docopt, python-feedparser, python-html2text, python-ordered-set, python-psutil, python-pydantic, python-tomli, python-validate-pyproject, speex, xmlto
+WARNING: cannot read detailed chunk info, per-device usage will not be shown, run as root
+WARNING: cannot read detailed chunk info, per-device usage will not be shown, run as root
+WARNING: cannot read detailed chunk info, per-device usage will not be shown, run as root
+WARNING: cannot read detailed chunk info, per-device usage will not be shown, run as root
+WARNING: cannot read detailed chunk info, per-device usage will not be shown, run as root
+
+========== Disk Usage & Origins ==========
+Mount           : Usage    : Free       : FS       : Type       : Device                 : Origin                               : Subvol
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/               :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@
+/.snapshots     :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@.snapshots
+/boot           :   75.0% :    133M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    :
+/home           :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@home
+/media/1tb      :   51.0% :    861G GB : ext4     : 1.0        : /dev/sda1              : sda.sda1                             :
+/media/1tb_2    :   51.0% :    859G GB : ext4     : 1.0        : /dev/sdb1              : sdb.sdb1                             :
+/var/cache/pacman/pkg :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@pkg
+/var/log        :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@log
+
+========== Pacman Statistics ==========
+Category           : Count/Size
+───────────────────────────────────
+Total Packages     : 479
+  ┗━ Native        : 472
+  ┗━ Foreign/AUR   : 7
+-----------------------------------
+Explicitly Sourced : 79
+As Dependencies    : 400
+-----------------------------------
+Pacman Cache Size  : 50G
+
+========== Summary ==========
+✘ Attention Required: 10 potential issue(s) found.
+
