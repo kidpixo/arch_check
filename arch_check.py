@@ -484,7 +484,7 @@ def check_pacnew(as_dict=False):
             "issues": len(found) if found else 0
         }
         return result
-    print_header("Config Files (.pacnew)")
+    print_header("Config Files (.pacnew/.pacsave)")
     if found:
         issue_count += len(found)
         for f in found:
@@ -759,17 +759,36 @@ def main():
                         results[name] = func(as_dict=True)
                 else:
                     results[name] = None
-        # Add summary
+        # Add summary with per-section issues
+        issues_by_section = {k: (v.get('issues', 0) if isinstance(v, dict) else 0) for k, v in results.items() if k != 'summary'}
         results['summary'] = {
-            'issues': sum((v.get('issues', 0) if isinstance(v, dict) else 0) for v in results.values() if v),
+            'issues': sum(issues_by_section.values()),
+            'issues_by_section': issues_by_section,
             'status': 'ok' if all((v.get('status', 'ok') == 'ok' if isinstance(v, dict) else True) for v in results.values() if v) else 'attention',
         }
         print(json.dumps(results, indent=2))
     else:
         for selected, func, name in checks:
             if selected:
-                func()
+                res = func()  # Some checks return dicts, some print directly
         print_header("Summary")
+        # Collect per-section issues for enabled checks
+        issues_by_section = {}
+        for selected, func, name in checks:
+            if selected and name in ('kernel', 'smart', 'pacnew', 'services', 'orphans', 'stats', 'sensors', 'disk'):
+                try:
+                    if name == 'sensors':
+                        result = func(as_dict=True)
+                    else:
+                        result = func(as_dict=True)
+                    issues_by_section[name] = result.get('issues', 0) if isinstance(result, dict) else 0
+                except Exception:
+                    issues_by_section[name] = 0
+        if issues_by_section:
+            print(f"{BOLD}Issues by section:{RESET}")
+            for section, count in issues_by_section.items():
+                color = GREEN if count == 0 else RED
+                print(f"  {color}{section}: {count}{RESET}")
         if issue_count == 0:
             print(f"{GREEN}{BOLD}✔ System Healthy: No issues detected.{RESET}")
         else:

@@ -150,8 +150,12 @@ Kernel check failed.
 
 **Example:**
 ```
-	-> /etc/pacman.conf.pacnew
-	-> /etc/makepkg.conf.pacnew
+========== Config Files (.pacnew) ==========
+  -> /etc/pacman.conf.pacnew
+  -> /etc/makepkg.conf.pacnew
+  -> /etc/makepkg.conf.d/fortran.conf.pacnew
+  -> /etc/pulse/default.pa.pacnew
+  -> /etc/pulse/default.pa.pacsave
 ```
 
 ### `-s`, `--services`  
