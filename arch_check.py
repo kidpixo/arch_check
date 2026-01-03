@@ -332,30 +332,72 @@ def check_disk(as_dict=False):
             # Btrfs-specific reporting (optional, but will be overwritten by df below)
             if fstype == "btrfs":
                 try:
-                    btrfs_out = subprocess.check_output(["btrfs", "filesystem", "usage", "-b", mount], text=True)
-                    total_bytes = used_bytes = free_bytes = None
-                    for line in btrfs_out.splitlines():
-                        if "Device size:" in line:
-                            total_bytes = int(line.split(":",1)[1].strip().split()[0])
-                        elif "Used:" in line and "Device size:" not in line:
-                            used_bytes = int(line.split(":",1)[1].strip().split()[0])
-                        elif "Free (estimated):" in line:
-                            free_bytes = int(line.split(":",1)[1].strip().split()[0])
-                    if total_bytes and used_bytes is not None:
+                    import re
+                    # Prefer the more-structured 'btrfs filesystem df -b' output (bytes)
+                    btrfs_df = subprocess.check_output(["btrfs", "filesystem", "df", "-b", mount], text=True)
+                    total_bytes = 0
+                    used_bytes = 0
+                    for line in btrfs_df.splitlines():
+                        m_total = re.search(r'total=(\d+)', line)
+                        m_used = re.search(r'used=(\d+)', line)
+                        if m_total:
+                            total_bytes += int(m_total.group(1))
+                        if m_used:
+                            used_bytes += int(m_used.group(1))
+
+                    if total_bytes > 0:
                         percent = (used_bytes / total_bytes) * 100
                         entry["usage_percent"] = round(percent, 1)
                         entry["free_gb"] = round((total_bytes - used_bytes)/(2**30), 2)
-                    elif total_bytes and free_bytes is not None:
-                        percent = (1 - (free_bytes / total_bytes)) * 100
-                        entry["usage_percent"] = round(percent, 1)
-                        entry["free_gb"] = round(free_bytes/(2**30), 2)
                     else:
-                        entry["usage_percent"] = "?"
-                        entry["free_gb"] = "?"
+                        # Fallback to older 'btrfs filesystem usage -b' parsing if df didn't report totals
+                        btrfs_out = subprocess.check_output(["btrfs", "filesystem", "usage", "-b", mount], text=True)
+                        total_bytes = used_bytes = free_bytes = None
+                        for line in btrfs_out.splitlines():
+                            if "Device size:" in line:
+                                try:
+                                    total_bytes = int(line.split(":",1)[1].strip().split()[0])
+                                except Exception:
+                                    pass
+                            elif "Used:" in line and "Device size:" not in line:
+                                try:
+                                    used_bytes = int(line.split(":",1)[1].strip().split()[0])
+                                except Exception:
+                                    pass
+                            elif "Free (estimated):" in line:
+                                try:
+                                    free_bytes = int(line.split(":",1)[1].strip().split()[0])
+                                except Exception:
+                                    pass
+                        if total_bytes and used_bytes is not None:
+                            percent = (used_bytes / total_bytes) * 100
+                            entry["usage_percent"] = round(percent, 1)
+                            entry["free_gb"] = round((total_bytes - used_bytes)/(2**30), 2)
+                        elif total_bytes and free_bytes is not None:
+                            percent = (1 - (free_bytes / total_bytes)) * 100
+                            entry["usage_percent"] = round(percent, 1)
+                            entry["free_gb"] = round(free_bytes/(2**30), 2)
+                        else:
+                            entry["usage_percent"] = "?"
+                            entry["free_gb"] = "?"
                 except Exception as e:
                     entry["usage_percent"] = "?"
                     entry["free_gb"] = "?"
                     entry["btrfs_error"] = str(e)
+
+                # Attempt to discover subvolume name/path for mounted subvolumes
+                try:
+                    subvol_show = subprocess.check_output(["btrfs", "subvolume", "show", mount], text=True, stderr=subprocess.DEVNULL)
+                    for line in subvol_show.splitlines():
+                        if line.strip().startswith("Name:"):
+                            entry["subvol"] = line.split(":",1)[1].strip()
+                            break
+                        if line.strip().startswith("Path:"):
+                            entry["subvol"] = line.split(":",1)[1].strip()
+                            break
+                except Exception:
+                    # keep any subvol detected from fstab
+                    pass
                 entry["status"] = "ok"
             else:
                 entry["usage_percent"] = "?"

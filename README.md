@@ -1,7 +1,9 @@
-
 # arch_check
 **Arch Linux Health & Disk Origin CLI**  
 *One-command system health check and disk ancestry for Arch Linux, with zero dependencies.*
+# arch_check
+**Arch Linux Health & Disk Origin CLI**  
+*One-command system health and disk ancestry for Arch Linux, with zero Python package dependencies (relies on system binaries).*
 
 ---
 
@@ -16,7 +18,7 @@ Tired of running multiple commands to check disk usage, origins (LVM, LUKS, btrf
 
 ## Key Features
 
-- **Disk Usage & Origin:** Shows usage, free space, filesystem, and device ancestry for all major mounts (supports ext4, btrfs, LVM, LUKS).
+- **Disk Usage & Origin:** Shows usage, free space, filesystem, and device ancestry for all major mounts (supports ext4, btrfs, LVM, LUKS). Skips virtual and temporary filesystems for clarity.
 - **Temperature Sensors:** Reports all available temperature sensors and warns if any are high.
 - **SMART Disk Health:** Summarizes SMART status for all disks (if supported).
 - **Kernel Version Check:** Detects mismatches between running and installed kernel.
@@ -29,14 +31,52 @@ Tired of running multiple commands to check disk usage, origins (LVM, LUKS, btrf
 
 ---
 
+## Skipped Filesystems
+
+To keep the output focused and relevant, arch_check automatically skips virtual, temporary, and special-purpose filesystems when reporting disk usage and origins. These filesystems do not represent persistent storage or user data and are typically used by the kernel or system processes.
+
+**Skipped filesystems include:**
+- swap
+- tmpfs
+- devtmpfs
+- proc
+- sysfs
+- cgroup
+- mqueue
+- hugetlbfs
+- fusectl
+- configfs
+- securityfs
+- pstore
+- efivarfs
+- debugfs
+- tracefs
+- ramfs
+- overlay
+- squashfs
+- autofs
+- binfmt_misc
+- bpf
+- nsfs
+
+**Why skip them?**
+These filesystems are either virtual (`tmpfs` and `proc`), used for system internals, or provide temporary storage. They do not contain persistent user data and are not useful for health or origin checks. By skipping them, `arch_check` keeps the output clean and focused on real disks and partitions that matter for system health and maintenance.
+
+---
+
+## Prerequisites & Dependencies
+
 ## Prerequisites & Dependencies
 
 - **Python:** 3.8 or newer
 - **Arch Linux:** Required for full features
-- **System Packages:**
-	- `lm_sensors` (for temperature)
-	- `smartmontools` (for SMART)
-	- `systemd`, `pacman`
+- **System packages:**
+  - `btrfs-progs` (for btrfs usage/subvolume info)
+  - `lm_sensors` (for temperature)
+  - `smartmontools` (for SMART)
+  - `systemd`, `pacman` (runtime utilities)
+
+Note: Some checks (for example `smartctl`, `btrfs subvolume show`, or reading `/var/cache/pacman/pkg`) may require root privileges to return full information; run the script with `sudo` when necessary.
 
 ---
 
@@ -77,6 +117,9 @@ Available switches :
   --log-level LOG_LEVEL  Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
   --color                Enable colored output (default if terminal)
   --no-color             Disable colored output (default if piped)
+  
+When using `--json`, the script runs checks with `as_dict=True` where supported and includes per-section `status` and `issues` fields for easy programmatic parsing.
+
 ```
 
 ---
@@ -102,14 +145,17 @@ Mount           : Usage    : Free       : FS       : Type       : Device        
 ```
 Mount           : Usage    : Free       : FS       : Type       : Device                 : Origin                               : Subvol
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-/               :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@
-/.snapshots     :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@.snapshots
+/               :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@
+/.snapshots     :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@.snapshots
 /boot           :   75.0% :    133M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    :
-/home           :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@home
+/home           :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@home
 /media/1tb      :   51.0% :    861G GB : ext4     : 1.0        : /dev/sda1              : sda.sda1                             :
 /media/1tb_2    :   51.0% :    859G GB : ext4     : 1.0        : /dev/sdb1              : sdb.sdb1                             :
-/var/cache/pacman/pkg :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@pkg
-/var/log        :      ?% :       ? GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@log
+/var/cache/pacman/pkg :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@pkg
+/var/log        :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@log
+```
+
+(Numeric btrfs Usage/Free requires `btrfs-progs` and appropriate privileges — use `sudo` if the current user cannot run `btrfs` commands.)
 ```
 
 ### `--sensors`  
@@ -201,3 +247,48 @@ Found a bug or want to add a feature? Please open an issue or submit a pull requ
 ## License
 
 **0BSD** — Free for any use, no warranty.
+
+## Troubleshooting
+
+- No numeric btrfs usage shown for `-d`:
+  - Ensure `btrfs-progs` is installed: `sudo pacman -S btrfs-progs`.
+  - Try running `sudo btrfs filesystem df -b /` to inspect totals and used bytes for the filesystem.
+
+- SMART output is empty or permission denied:
+  - `smartctl` often requires root: run `sudo smartctl -H /dev/sdX` (replace `/dev/sdX` with your device).
+
+- `sensors` shows nothing:
+  - Install and configure `lm_sensors`, then run `sensors`. Run `sudo sensors-detect` if needed.
+
+- Pacman cache size or some package stats are missing:
+  - Reading `/var/cache/pacman/pkg` may require privileges; try `sudo du -sh /var/cache/pacman/pkg`.
+
+## JSON Output (short schema example)
+
+When using `--json`, `arch_check` returns a top-level object with keys for each enabled check and a `summary` object. Each section provides `status` and `issues` where applicable. Minimal example:
+
+```json
+{
+  "disk": {
+    "mounts": [
+      {
+        "mount": "/",
+        "usage_percent": 56.5,
+        "free_gb": 63.77,
+        "fstype": "btrfs",
+        "device": "/dev/nvme0n1p2",
+        "origin": "nvme0n1.nvme0n1p2",
+        "subvol": "/@"
+      }
+    ],
+    "status": "ok",
+    "issues": 0
+  },
+  "summary": {
+    "issues": 35,
+    "status": "attention"
+  }
+}
+```
+
+For scripting, check the per-section `status` and `issues` fields to determine if work is required.
