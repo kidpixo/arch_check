@@ -430,6 +430,15 @@ def check_disk(as_dict=False):
             entry["fstype"] = fstype if fstype else "?"
             # Type: use 'fsver' if present, else 'type' (lsblk -f -J may not have 'type')
             entry["type"] = dev_entry.get("fsver") or dev_entry.get("type", "?") if dev_entry else "?"
+            # For btrfs, if lsblk didn't provide a useful type, show the btrfs-progs version
+            if fstype == "btrfs" and (not entry.get("type") or entry.get("type") == "?"):
+                try:
+                    bv = subprocess.check_output(["btrfs", "--version"], text=True).splitlines()[0]
+                    # Typical output: 'btrfs-progs v5.15.1' -> show version number
+                    parts = bv.split()
+                    entry["type"] = parts[1] if len(parts) > 1 else bv
+                except Exception:
+                    entry["type"] = "btrfs"
             # Label
             entry["label"] = dev_entry.get("label", "") if dev_entry else ""
             # Origin chain (skip the mount leaf, join parent names)
