@@ -12,7 +12,7 @@ pkgbase = arch-check
 	depends = python
 	source = arch_check.py
 	source = pyproject.toml
-	sha256sums = 65a694cbc1264cee693802d85d5fdf2b20cf05bfb1895e48bb30e8310ed46b6c
+	sha256sums = a53bb2565438544b0a61052c8e1abfec0de1a3c32702cf2683a6d8c33ef98d9e
 	sha256sums = c7b09c9af408036d3aa2ee7e19fbf009f90fd14e05073434bd21d5922d2930d4
 
 pkgname = arch-check
