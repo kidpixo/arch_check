@@ -1,4 +1,8 @@
 tags
+# release tarballs
+*.pkg.tar.zst
+*.tar.gz
+
 # Python
 __pycache__/
 *.pyc
