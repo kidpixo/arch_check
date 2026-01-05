@@ -278,7 +278,10 @@ When using `--json`, `arch_check` returns a top-level object with keys for each 
         "fstype": "btrfs",
         "device": "/dev/nvme0n1p2",
         "origin": "nvme0n1.nvme0n1p2",
-        "subvol": "/@"
+        "subvol": "/@",
+        "btrfs_device_size_bytes": 1717986918400,
+        "btrfs_used_bytes": 68719476736,
+        "btrfs_free_estimated_bytes": 1659268433152
       }
     ],
     "status": "ok",
@@ -290,5 +293,10 @@ When using `--json`, `arch_check` returns a top-level object with keys for each 
   }
 }
 ```
+
+Notes:
+- `btrfs_device_size_bytes`: total device size (bytes) as reported by `btrfs filesystem usage -b` or summed allocation totals.
+- `btrfs_used_bytes`: used bytes on the filesystem.
+- `btrfs_free_estimated_bytes`: estimated free bytes when available (from `Free (estimated)`).
 
 For scripting, check the per-section `status` and `issues` fields to determine if work is required.

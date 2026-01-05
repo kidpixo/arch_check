@@ -1,6 +1,6 @@
 pkgbase = arch-check
 	pkgdesc = Arch Linux system health and disk origin checker CLI
-	pkgver = 1.0.0
+	pkgver = 0.1.0
 	pkgrel = 1
 	url = https://github.com/kidpixo/arch-check
 	arch = any
@@ -12,7 +12,7 @@ pkgbase = arch-check
 	depends = python
 	source = arch_check.py
 	source = pyproject.toml
-	sha256sums = a53bb2565438544b0a61052c8e1abfec0de1a3c32702cf2683a6d8c33ef98d9e
-	sha256sums = c7b09c9af408036d3aa2ee7e19fbf009f90fd14e05073434bd21d5922d2930d4
+	sha256sums = e4946b71bf9c4007b7e6ed1ff6d307b007dcb37e6a4da973439f64280838920b
+	sha256sums = 918abc64006e948fe94048139e3755042d9b490579632f26f105fee000f5cfd1
 
 pkgname = arch-check

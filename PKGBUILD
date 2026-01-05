@@ -1,7 +1,7 @@
 # Maintainer: kidpixo <kidpixo@gmail.com>
 pkgname=arch-check
 gitname=arch-check
-pkgver=1.0.0
+pkgver=0.1.0
 pkgrel=1
 pkgdesc="Arch Linux system health and disk origin checker CLI"
 arch=(any)
@@ -10,8 +10,8 @@ license=('0BSD')
 depends=('python')
 makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
 source=("arch_check.py" "pyproject.toml")
-sha256sums=('a53bb2565438544b0a61052c8e1abfec0de1a3c32702cf2683a6d8c33ef98d9e'
-            'c7b09c9af408036d3aa2ee7e19fbf009f90fd14e05073434bd21d5922d2930d4')
+sha256sums=('e4946b71bf9c4007b7e6ed1ff6d307b007dcb37e6a4da973439f64280838920b'
+            '918abc64006e948fe94048139e3755042d9b490579632f26f105fee000f5cfd1')
 
 build() {
   cd "$srcdir"
@@ -20,7 +20,13 @@ build() {
 
 package() {
   cd "$srcdir"
-  python -m installer --destdir="$pkgdir" dist/*.whl
+  # Find the built wheel file in dist/ (avoid hardcoded names and glob issues)
+  wheel_file=$(ls dist/*.whl 2>/dev/null | head -n1)
+  if [ -z "$wheel_file" ]; then
+    echo "No wheel found in dist/, aborting"
+    return 1
+  fi
+  python -m installer --destdir="$pkgdir" "$wheel_file"
   install -Dm644 pyproject.toml "$pkgdir/usr/share/$pkgname/pyproject.toml"
   install -Dm644 arch_check.py "$pkgdir/usr/share/$pkgname/arch_check.py"
 }

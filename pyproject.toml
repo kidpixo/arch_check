@@ -1,7 +1,7 @@
 [project]
 name = "arch_check"
-version = "1.0.0"
-description = "Arch Linux system health and disk origin checker CLI."
+version = "0.1.0"
+description = "One-command Arch Linux health CLI — checks disks (LVM/LUKS/btrfs), kernel, services, SMART, sensors; zero Python deps."
 authors = [ { name = "kidpixo" } ]
 license = "0BSD"
 readme = "README.md"

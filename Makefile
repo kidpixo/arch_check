@@ -13,6 +13,9 @@ pkgbuild: ## Build Arch package using PKGBUILD (PKGBUILD must exist)
 clean_build: ## Remove build, dist, *.egg-info, pkg, and src directories
 	rm -rf build dist *.egg-info pkg src
 
+makepkg_install: pkgbuild ## Build and install Arch package using PKGBUILD (PKGBUILD must exist)
+	makepkg -si
+
 #################################################################################
 # Self Documenting Commands                                                     #
 

@@ -349,6 +349,8 @@ def check_disk(as_dict=False):
                         percent = (used_bytes / total_bytes) * 100
                         entry["usage_percent"] = round(percent, 1)
                         entry["free_gb"] = round((total_bytes - used_bytes)/(2**30), 2)
+                        entry["btrfs_device_size_bytes"] = int(total_bytes)
+                        entry["btrfs_used_bytes"] = int(used_bytes)
                     else:
                         # Fallback to older 'btrfs filesystem usage -b' parsing if df didn't report totals
                         btrfs_out = subprocess.check_output(["btrfs", "filesystem", "usage", "-b", mount], text=True)
@@ -373,10 +375,16 @@ def check_disk(as_dict=False):
                             percent = (used_bytes / total_bytes) * 100
                             entry["usage_percent"] = round(percent, 1)
                             entry["free_gb"] = round((total_bytes - used_bytes)/(2**30), 2)
+                            entry["btrfs_device_size_bytes"] = int(total_bytes)
+                            entry["btrfs_used_bytes"] = int(used_bytes)
+                            if free_bytes is not None:
+                                entry["btrfs_free_estimated_bytes"] = int(free_bytes)
                         elif total_bytes and free_bytes is not None:
                             percent = (1 - (free_bytes / total_bytes)) * 100
                             entry["usage_percent"] = round(percent, 1)
                             entry["free_gb"] = round(free_bytes/(2**30), 2)
+                            entry["btrfs_device_size_bytes"] = int(total_bytes)
+                            entry["btrfs_free_estimated_bytes"] = int(free_bytes)
                         else:
                             entry["usage_percent"] = "?"
                             entry["free_gb"] = "?"
@@ -384,20 +392,11 @@ def check_disk(as_dict=False):
                     entry["usage_percent"] = "?"
                     entry["free_gb"] = "?"
                     entry["btrfs_error"] = str(e)
+                    entry["btrfs_device_size_bytes"] = None
+                    entry["btrfs_used_bytes"] = None
+                    entry["btrfs_free_estimated_bytes"] = None
 
-                # Attempt to discover subvolume name/path for mounted subvolumes
-                try:
-                    subvol_show = subprocess.check_output(["btrfs", "subvolume", "show", mount], text=True, stderr=subprocess.DEVNULL)
-                    for line in subvol_show.splitlines():
-                        if line.strip().startswith("Name:"):
-                            entry["subvol"] = line.split(":",1)[1].strip()
-                            break
-                        if line.strip().startswith("Path:"):
-                            entry["subvol"] = line.split(":",1)[1].strip()
-                            break
-                except Exception:
-                    # keep any subvol detected from fstab
-                    pass
+                # Defer detailed subvolume parsing until after we collect fstab info
                 entry["status"] = "ok"
             else:
                 entry["usage_percent"] = "?"
@@ -454,6 +453,41 @@ def check_disk(as_dict=False):
                 if opt.startswith('subvol='):
                     subvol = opt.split('=',1)[1]
             entry["subvol"] = subvol
+            # If this is a btrfs mount, try to gather richer subvolume metadata and prefer fstab's subvol if present
+            if fstype == 'btrfs':
+                entry.setdefault('subvol_id', None)
+                entry.setdefault('subvol_path', None)
+                entry.setdefault('subvol_uuid', None)
+                entry.setdefault('subvol_name', None)
+                try:
+                    subvol_show = subprocess.check_output(["btrfs", "subvolume", "show", mount], text=True, stderr=subprocess.DEVNULL)
+                    for line in subvol_show.splitlines():
+                        l = line.strip()
+                        if l.startswith('Subvolume ID:'):
+                            try:
+                                entry['subvol_id'] = int(l.split(':',1)[1].strip())
+                            except Exception:
+                                pass
+                        elif l.startswith('Path:'):
+                            entry['subvol_path'] = l.split(':',1)[1].strip()
+                        elif l.startswith('Name:'):
+                            entry['subvol_name'] = l.split(':',1)[1].strip()
+                        elif l.startswith('UUID:') or l.startswith('Received UUID:'):
+                            # Prefer UUID line if present
+                            entry['subvol_uuid'] = l.split(':',1)[1].strip()
+                except Exception:
+                    # leave the subvol_* fields as None
+                    pass
+
+                # Decide what to show in the human-friendly Subvol column: prefer fstab subvol, then Name, then Path
+                display_subvol = entry.get('subvol') or entry.get('subvol_name') or entry.get('subvol_path') or ''
+                # Normalize display: strip leading/trailing slashes
+                display_subvol = display_subvol.strip('/') if display_subvol else display_subvol
+                if display_subvol and not display_subvol.startswith('@'):
+                    # keep as-is; many setups name subvolumes with @ prefixes, but don't enforce
+                    pass
+                # Attach final normalized display value
+                entry['subvol'] = display_subvol
         except Exception as e:
             entry["status"] = "error"
             entry["error"] = str(e)
@@ -462,14 +496,35 @@ def check_disk(as_dict=False):
 
     if as_dict:
         return {"mounts": results, "status": "ok", "issues": sum(1 for e in results if e.get("status") == "critical")}
+    # Only show the compact Btrfs used/total column when we actually have btrfs mounts
+    show_btrfs = any((e.get('fstype') == 'btrfs') or (e.get('btrfs_device_size_bytes') is not None) for e in results)
     print_header("Disk Usage & Origins")
-    print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<36} : {'Subvol'}{RESET}")
-    print("─" * 140)
+    if show_btrfs:
+        print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<36} : {'Btrfs':<18} : {'Subvol'}{RESET}")
+        print("─" * 160)
+    else:
+        print(f"{BOLD}{'Mount':<15} : {'Usage':<8} : {'Free':<10} : {'FS':<8} : {'Type':<10} : {'Device':<22} : {'Origin':<36}{RESET}")
+        print("─" * 140)
+
     for entry in results:
         color = GREEN if entry["status"] == "ok" else (YELLOW if entry["status"] == "warn" else RED)
         def safe(val, default="?"):
             return str(val) if val is not None else default
-        print(f"{safe(entry['mount']):<15} : {color}{safe(entry.get('usage_percent')):>6}%{RESET} : {safe(entry.get('free_gb')):>7} GB : {safe(entry.get('fstype')):<8} : {safe(entry.get('type')):<10} : {safe(entry.get('device')):<22} : {safe(entry.get('origin')):<36} : {safe(entry.get('subvol'),'')}")
+        # Prepare compact btrfs used/total display when available (only if show_btrfs)
+        btrfs_col = ""
+        if show_btrfs:
+            try:
+                if entry.get("btrfs_used_bytes") and entry.get("btrfs_device_size_bytes"):
+                    used_gb = float(entry.get("btrfs_used_bytes") or 0) / (2**30)
+                    total_gb = float(entry.get("btrfs_device_size_bytes") or 0) / (2**30)
+                    btrfs_col = f"{used_gb:.2f}/{total_gb:.2f} GiB"
+            except Exception:
+                btrfs_col = ""
+
+        if show_btrfs:
+            print(f"{safe(entry['mount']):<15} : {color}{safe(entry.get('usage_percent')):>6}%{RESET} : {safe(entry.get('free_gb')):>7} GB : {safe(entry.get('fstype')):<8} : {safe(entry.get('type')):<10} : {safe(entry.get('device')):<22} : {safe(entry.get('origin')):<36} : {btrfs_col:<18} : {safe(entry.get('subvol'),'')}")
+        else:
+            print(f"{safe(entry['mount']):<15} : {color}{safe(entry.get('usage_percent')):>6}%{RESET} : {safe(entry.get('free_gb')):>7} GB : {safe(entry.get('fstype')):<8} : {safe(entry.get('type')):<10} : {safe(entry.get('device')):<22} : {safe(entry.get('origin')):<36}")
 
 def check_kernel():
     global issue_count
