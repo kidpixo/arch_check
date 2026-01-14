@@ -2,9 +2,6 @@
 #TEST_PATH=extensions/
 .DEFAULT_GOAL := help
 
-makepkg_install: pkgbuild ## Build and install Arch package using PKGBUILD (PKGBUILD must exist)
-	makepkg -si
-
 #################################################################################
 # Self Documenting Commands                                                     #
 
