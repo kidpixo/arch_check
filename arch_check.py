@@ -19,7 +19,7 @@ def check_smart(as_dict=False):
         for dev in devs:
             dev_result = {"device": dev, "status": None, "attributes": [], "error": None}
             try:
-                out = subprocess.check_output(["smartctl", "-H", dev], text=True, stderr=subprocess.STDOUT)
+                out =subprocess.check_output(["smartctl", "-H", dev], text=True, stderr=subprocess.STDOUT)
                 if "PASSED" in out:
                     dev_result["status"] = "PASSED"
                     if not as_dict:
@@ -638,7 +638,10 @@ def check_orphans(as_dict=False):
             }
         print_header("Orphaned Packages")
         if out:
-            print(f"{YELLOW}Orphans: {out.replace(chr(10), ', ')}{RESET}")
+            print(f"{YELLOW}Orphans: {out.replace(chr(10), ' ')}{RESET}")
+            print(f'  {RED}Caution: Review the list before removing anything!{RESET}')
+            print(f'  {YELLOW}Tip({RED}potentially dangerous{RESET}): Run "pacman -Rns $(pacman -Qdtq)" to remove orphans, i.e. with pactree:{RESET}')
+            print(f'  for p in {out.replace(chr(10), " ")}; do pactree -r $p; echo {30*"="} ; done')
         else:
             print(f"{GREEN}No orphans.{RESET}")
     except Exception as e:
