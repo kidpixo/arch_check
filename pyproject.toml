@@ -1,6 +1,6 @@
 [project]
 name = "arch_check"
-version = "0.3.0"
+version = "0.4.0"
 description = "One-command Arch Linux health CLI — checks disks (LVM/LUKS/btrfs), kernel, services, SMART, sensors; zero Python deps."
 authors = [ { name = "kidpixo" } ]
 license = "0BSD"

