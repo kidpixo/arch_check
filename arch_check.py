@@ -321,9 +321,42 @@ def check_disk(as_dict=False):
     except Exception as e:
         logging.debug(f"Failed to parse df -h: {e}")
 
+    def resolve_via_findmnt(mount):
+        """Fallback for mounts lsblk's tree doesn't surface directly
+        (e.g. multiple btrfs subvolumes sharing one LUKS/device-mapper
+        node). Returns a synthetic dev_entry dict, or None."""
+        try:
+            source = subprocess.check_output(
+                ["findmnt", "-no", "SOURCE", mount], text=True
+            ).strip()
+            fstype_out = subprocess.check_output(
+                ["findmnt", "-no", "FSTYPE", mount], text=True
+            ).strip()
+            name = source.replace("/dev/", "")
+            # Walk up to the parent device, same technique as get_device_origin
+            try:
+                pkname = subprocess.check_output(
+                    ["lsblk", "-no", "PKNAME", source], text=True
+                ).strip().split("\n")[-1]
+            except Exception:
+                pkname = None
+            synthetic = {"name": name, "fstype": fstype_out}
+            chain = [{"name": pkname}, synthetic] if pkname else [synthetic]
+            return synthetic, chain
+        except Exception as e:
+            logging.debug(f"findmnt fallback failed for {mount}: {e}")
+            return None, None
+
     for mount in all_mounts:
         # Find device info first to check fstype
         dev_entry, chain = find_mount_and_chain(blkinfo, mount)
+        if dev_entry is None:
+            # lsblk's per-device mountpoints array can miss mounts when
+            # multiple mountpoints (e.g. btrfs subvolumes) share a single
+            # device-mapper node, which is common with LUKS. Fall back to
+            # findmnt, which is mount-table-aware rather than block-device-
+            # tree-aware.
+            dev_entry, chain = resolve_via_findmnt(mount)
         fstype = dev_entry.get("fstype", "") if dev_entry else ""
         if fstype in skip_fstypes or mount in skip_mounts:
             continue
